@@ -26,7 +26,7 @@
 ### 1. Клонирование репозитория
 
 ```bash
-git clone <https://github.com/Sopirm/systemControl_proj>
+git clone https://github.com/Sopirm/systemControl_proj
 cd systemControl_proj
 ```
 
