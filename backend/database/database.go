@@ -1,0 +1,43 @@
+package database
+
+import (
+	"fmt"
+	"systemControl_proj/config"
+	"systemControl_proj/models"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+var DB *gorm.DB
+
+// инициализирует соединение с базой данных
+func SetupDatabase(config *config.Config) (*gorm.DB, error) {
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		config.Database.Host,
+		config.Database.Port,
+		config.Database.User,
+		config.Database.Password,
+		config.Database.DBName,
+		config.Database.SSLMode,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	DB = db
+
+	err = db.AutoMigrate(
+		&models.User{},
+		&models.Project{},
+		&models.Defect{},
+		&models.Comment{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
