@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 	"systemControl_proj/config"
-	"systemControl_proj/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -29,15 +28,8 @@ func SetupDatabase(config *config.Config) (*gorm.DB, error) {
 
 	DB = db
 
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.Project{},
-		&models.Defect{},
-		&models.Comment{},
-	)
-	if err != nil {
-		return nil, err
-	}
+	// База данных настроена, миграции выполняются отдельно
+	// через специальный инструмент в папке cmd/migrate
 
 	return db, nil
 }
