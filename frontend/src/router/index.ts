@@ -69,6 +69,13 @@ router.beforeEach((to, from, next) => {
   const isAuthenticated = authService.isLoggedIn()
   const currentUser = authService.getCurrentUser()
 
+  // Если пользователь уже авторизован и пытается перейти на страницы входа или регистрации
+  if (isAuthenticated && (to.path === '/login' || to.path === '/register' || to.path === '/')) {
+    console.log('Пользователь авторизован, перенаправляем на /projects')
+    next('/projects')
+    return
+  }
+
   // Проверка авторизации
   if (requiresAuth && !isAuthenticated) {
     next('/login')
@@ -78,7 +85,7 @@ router.beforeEach((to, from, next) => {
   // Проверка роли пользователя
   if (requiredRole && currentUser && currentUser.role !== requiredRole) {
     // Если требуется определенная роль, но у пользователя она отсутствует
-    next('/') // Перенаправление на главную страницу
+    next('/projects') // Перенаправление на страницу проектов
     return
   }
   

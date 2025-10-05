@@ -1,8 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import BaseCard from '../components/BaseCard.vue'
+import { authService } from '../services/api'
+import { useRouter } from 'vue-router'
 
-const isLoggedIn = ref(false)
+const router = useRouter()
+const isLoggedIn = ref(authService.isLoggedIn())
+
+// Функция для проверки авторизации
+const checkAuth = () => {
+  isLoggedIn.value = authService.isLoggedIn()
+  
+  // Если пользователь авторизован, перенаправляем на страницу проектов
+  if (isLoggedIn.value) {
+    router.push('/projects')
+  }
+}
+
+// Проверяем при монтировании компонента
+onMounted(() => {
+  checkAuth()
+  
+  // Слушаем события авторизации
+  window.addEventListener('auth-change', checkAuth)
+})
 </script>
 
 <template>
