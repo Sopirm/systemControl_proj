@@ -1,61 +1,109 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
+import { useAuth } from '../composables/useAuth'
+import { projectService, type Project } from '../services/projectService'
+import { defectService, type DefectStats } from '../services/defectService'
 
-interface Project {
-  id: number
-  name: string
-  description: string
-  status: string
-  defectsCount: number
-  completionRate: number
+const router = useRouter()
+const { isManager } = useAuth()
+const projects = ref<Project[]>([])
+const isLoading = ref(true)
+const error = ref('')
+const projectDefectStats = ref<Record<number, DefectStats>>({})
+
+// Загрузка статистики дефектов для проекта
+const loadDefectStats = async (projectId: number) => {
+  try {
+    const stats = await defectService.getDefectStatsByProjectId(projectId)
+    projectDefectStats.value[projectId] = stats
+  } catch (err) {
+    console.error(`Ошибка при загрузке статистики дефектов для проекта ${projectId}:`, err)
+    // Используем демо-данные в случае ошибки
+    projectDefectStats.value[projectId] = defectService.generateDemoDefectStats(projectId)
+  }
 }
 
-// Временные данные для демонстрации
-const projects = ref<Project[]>([
-  {
-    id: 1,
-    name: 'ЖК "Солнечный"',
-    description: 'Жилой комплекс из 3 корпусов на ул. Ленина',
-    status: 'active',
-    defectsCount: 12,
-    completionRate: 65
-  },
-  {
-    id: 2,
-    name: 'Бизнес-центр "Меркурий"',
-    description: 'Офисное здание класса А в центре города',
-    status: 'active',
-    defectsCount: 8,
-    completionRate: 40
-  },
-  {
-    id: 3,
-    name: 'Торговый центр "Галактика"',
-    description: 'Многофункциональный торговый комплекс',
-    status: 'planning',
-    defectsCount: 0,
-    completionRate: 0
-  }
-])
+// Получение статистики дефектов для проекта
+const getDefectStats = (project: Project): DefectStats => {
+  return projectDefectStats.value[project.id] || { active: 0, resolved: 0, total: 0 }
+}
 
-const isLoading = ref(false)
+// Загрузка списка проектов
+const loadProjects = async () => {
+  try {
+    isLoading.value = true
+    error.value = ''
+    const data = await projectService.getAllProjects()
+    projects.value = data
+    
+    // Загружаем статистику дефектов для каждого проекта
+    for (const project of data) {
+      await loadDefectStats(project.id)
+    }
+  } catch (err) {
+    console.error('Ошибка при загрузке проектов:', err)
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить проекты'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Создание нового проекта
+const createProject = () => {
+  router.push('/projects/create')
+}
+
+// Отображаемые статусы
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'Активный'
+    case 'completed':
+      return 'Завершен'
+    case 'suspended':
+      return 'Приостановлен'
+    default:
+      return 'Планирование'
+  }
+}
+
+// Классы для статусов
+const getStatusClass = (status: string) => {
+  switch (status) {
+    case 'active':
+      return 'status-active'
+    case 'completed':
+      return 'status-completed'
+    case 'suspended':
+      return 'status-suspended'
+    default:
+      return 'status-planning'
+  }
+}
+
+// Загрузка проектов при монтировании компонента
+onMounted(() => {
+  loadProjects()
+})
 </script>
 
 <template>
   <div class="projects-page">
     <div class="page-header flex-between">
       <h1>Проекты</h1>
-      <BaseButton>Новый проект</BaseButton>
+      <BaseButton v-if="isManager" @click="createProject">Новый проект</BaseButton>
     </div>
+
+    <div v-if="error" class="alert alert-error">{{ error }}</div>
 
     <div v-if="isLoading" class="loading-indicator">Загрузка проектов...</div>
 
     <div v-else-if="projects.length === 0" class="empty-state">
       <p>Нет доступных проектов</p>
-      <BaseButton>Создать проект</BaseButton>
+      <BaseButton v-if="isManager" @click="createProject">Создать проект</BaseButton>
     </div>
 
     <div v-else class="projects-grid">
@@ -67,29 +115,48 @@ const isLoading = ref(false)
         
         <div class="project-stats">
           <div class="stat-item">
-            <span class="stat-label">Дефектов:</span>
-            <span class="stat-value">{{ project.defectsCount }}</span>
+            <span class="stat-label">Активные дефекты:</span>
+            <span class="stat-value">{{ getDefectStats(project).active }}</span>
           </div>
           <div class="stat-item">
-            <span class="stat-label">Готовность:</span>
-            <span class="stat-value">{{ project.completionRate }}%</span>
+            <span class="stat-label">Решенные дефекты:</span>
+            <span class="stat-value">{{ getDefectStats(project).resolved }}</span>
           </div>
         </div>
         
-        <div class="progress-bar">
-          <div
-            class="progress-bar-fill"
-            :style="{ width: `${project.completionRate}%` }"
-          ></div>
+        <div class="defect-progress">
+          <div class="defect-count">
+            <span class="count-label">Всего дефектов:</span>
+            <span class="count-value">{{ getDefectStats(project).total }}</span>
+          </div>
+          <div v-if="getDefectStats(project).total > 0" class="defect-ratio">
+            <div 
+              class="ratio-fill ratio-active" 
+              :style="{ width: `${getDefectStats(project).active / getDefectStats(project).total * 100}%` }"
+            ></div>
+            <div 
+              class="ratio-fill ratio-resolved" 
+              :style="{ width: `${getDefectStats(project).resolved / getDefectStats(project).total * 100}%` }"
+            ></div>
+          </div>
+          <div v-else class="defect-ratio empty-ratio">
+            <span class="empty-ratio-text">Нет дефектов</span>
+          </div>
         </div>
         
-        <div class="project-status">
-          <span
-            class="status-badge"
-            :class="project.status === 'active' ? 'status-active' : 'status-planning'"
-          >
-            {{ project.status === 'active' ? 'Активный' : 'Планирование' }}
-          </span>
+        <div class="project-info">
+          <div class="info-item">
+            <span class="info-label">Менеджер:</span>
+            <span class="info-value">{{ project.manager?.full_name || 'Не назначен' }}</span>
+          </div>
+          <div class="project-status">
+            <span
+              class="status-badge"
+              :class="getStatusClass(project.status)"
+            >
+              {{ getStatusLabel(project.status) }}
+            </span>
+          </div>
         </div>
         
         <template #footer>
@@ -164,17 +231,74 @@ h1 {
   margin-left: 0.25rem;
 }
 
-.progress-bar {
+.defect-progress {
+  margin-bottom: 1rem;
+}
+
+.defect-count {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.count-label {
+  color: var(--color-text-light);
+}
+
+.count-value {
+  font-weight: 500;
+}
+
+.defect-ratio {
   height: 6px;
   background-color: var(--color-border);
   border-radius: 3px;
-  margin-bottom: 1rem;
   overflow: hidden;
+  display: flex;
 }
 
-.progress-bar-fill {
+.ratio-fill {
   height: 100%;
-  background-color: var(--color-primary);
+}
+
+.ratio-active {
+  background-color: #ff9800;
+}
+
+.ratio-resolved {
+  background-color: #4caf50;
+}
+
+.empty-ratio {
+  height: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  font-size: 0.7rem;
+  color: var(--color-text-light);
+}
+
+.empty-ratio-text {
+  display: none;
+}
+
+.project-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.info-label {
+  color: var(--color-text-light);
+}
+
+.info-value {
+  font-weight: 500;
+  margin-left: 0.25rem;
 }
 
 .project-status {
@@ -199,6 +323,16 @@ h1 {
   color: #0277bd;
 }
 
+.status-completed {
+  background-color: rgba(96, 125, 139, 0.15);
+  color: #455a64;
+}
+
+.status-suspended {
+  background-color: rgba(255, 152, 0, 0.15);
+  color: #ef6c00;
+}
+
 .card-actions {
   display: flex;
   justify-content: flex-end;
@@ -218,5 +352,17 @@ h1 {
 .empty-state p {
   margin-bottom: 1rem;
   color: var(--color-text-light);
+}
+
+.alert {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--border-radius);
+}
+
+.alert-error {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #d32f2f;
+  border: 1px solid rgba(244, 67, 54, 0.3);
 }
 </style>

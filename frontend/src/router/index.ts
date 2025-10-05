@@ -27,6 +27,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/projects/create',
+      name: 'project-create',
+      component: () => import('../views/ProjectCreateView.vue'),
+      meta: { requiresAuth: true, requiredRole: 'manager' }
+    },
+    {
+      path: '/projects/:id/edit',
+      name: 'project-edit',
+      component: () => import('../views/ProjectEditView.vue'),
+      meta: { requiresAuth: true, requiredRole: 'manager' }
+    },
+    {
       path: '/projects/:id',
       name: 'project-detail',
       component: () => import('../views/ProjectDetailView.vue'),
