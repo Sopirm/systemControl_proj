@@ -1,64 +1,169 @@
-# frontend
+# Клиентская часть (Frontend) «СистемаКонтроля»
 
-This template should help get you started developing with Vue 3 in Vite.
+Фронтенд системы построен на Vue 3 с использованием TypeScript и Vite.
 
-## Recommended IDE Setup
+## Технологический стек
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- **Vue.js 3** - основной фреймворк
+- **TypeScript** - типизация JavaScript
+- **Vite** - инструмент сборки
+- **Vue Router** - маршрутизация
+- **Composables** - переиспользуемая бизнес-логика
+- **ESLint** - линтер для проверки кода
 
-## Type Support for `.vue` Imports in TS
+## Структура проекта
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+```
+frontend/
+├── public/              # Статические файлы
+├── src/                 # Исходный код
+│   ├── assets/          # Ресурсы (CSS, изображения)
+│   ├── components/      # Vue компоненты
+│   │   ├── AppHeader.vue      # Заголовок приложения
+│   │   ├── BaseButton.vue     # Кнопка
+│   │   ├── BaseCard.vue       # Карточка
+│   │   ├── BaseInput.vue      # Поле ввода
+│   │   ├── BaseSelect.vue     # Выпадающий список
+│   │   └── DefectItem.vue     # Элемент дефекта
+│   ├── composables/     # Переиспользуемая логика
+│   │   └── useAuth.ts         # Хук для работы с авторизацией
+│   ├── router/          # Маршрутизация
+│   │   └── index.ts           # Конфигурация маршрутов
+│   ├── services/        # API-сервисы
+│   │   ├── api.ts             # Основной API-сервис
+│   │   └── userService.ts     # Сервис для работы с пользователями
+│   ├── stores/          # Хранилище данных
+│   └── views/           # Страницы приложения
+│       ├── DefectDetailView.vue    # Детали дефекта
+│       ├── DefectsView.vue         # Список дефектов
+│       ├── HomeView.vue            # Главная страница
+│       ├── LoginView.vue           # Страница входа
+│       ├── ProjectDetailView.vue   # Детали проекта
+│       ├── ProjectsView.vue        # Список проектов
+│       ├── RegisterView.vue        # Регистрация
+│       ├── ReportsView.vue         # Отчеты
+│       └── UsersView.vue           # Управление пользователями
+├── .editorconfig        # Настройки редактора
+├── .gitattributes       # Настройки Git
+├── .gitignore           # Игнорируемые файлы
+├── .prettierrc.json     # Настройки форматирования кода
+├── env.d.ts             # Типы для переменных окружения
+├── eslint.config.ts     # Конфигурация ESLint
+├── index.html           # Точка входа HTML
+├── package-lock.json    # Фиксация версий зависимостей
+├── package.json         # Зависимости и скрипты
+├── playwright.config.ts # Конфигурация E2E тестов
+├── tsconfig.app.json    # Конфигурация TypeScript для приложения
+├── tsconfig.json        # Основная конфигурация TypeScript
+├── tsconfig.node.json   # Конфигурация TypeScript для Node.js
+├── tsconfig.vitest.json # Конфигурация TypeScript для тестов
+├── vite.config.ts       # Конфигурация сборщика Vite
+└── vitest.config.ts     # Конфигурация unit-тестов
+```
 
-## Customize configuration
+## Основные функциональные блоки
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+### Аутентификация и авторизация
+- Регистрация пользователей с выбором роли
+- Вход по имени пользователя или email
+- Защита маршрутов на основе статуса авторизации
+- Управление доступом на основе ролей
 
-## Project Setup
+### Управление пользователями
+- Просмотр списка пользователей (для менеджеров)
+- Изменение ролей пользователей (для менеджеров)
 
-```sh
+### Управление проектами
+- Просмотр списка проектов
+- Создание, редактирование и удаление проектов
+
+### Управление дефектами
+- Просмотр списка дефектов
+- Создание, редактирование и удаление дефектов
+- Изменение статуса дефектов
+
+### Отчетность
+- Просмотр аналитической информации
+
+## Запуск проекта
+
+### Установка зависимостей
+
+```bash
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Запуск сервера разработки
 
-```sh
+```bash
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+После запуска приложение будет доступно по адресу [http://localhost:5173](http://localhost:5173)
 
-```sh
+### Сборка для продакшн
+
+```bash
 npm run build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+### Запуск Unit-тестов
 
-```sh
+```bash
 npm run test:unit
 ```
 
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
+### Запуск E2E тестов
 
-```sh
-# Install browsers for the first run
+```bash
+# Установка браузеров при первом запуске
 npx playwright install
 
-# When testing on CI, must build the project first
-npm run build
-
-# Runs the end-to-end tests
+# Запуск всех тестов
 npm run test:e2e
-# Runs the tests only on Chromium
+
+# Запуск тестов только в Chromium
 npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
+
+# Запуск конкретного теста
 npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
+
+# Запуск тестов в режиме отладки
 npm run test:e2e -- --debug
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### Запуск линтера
 
-```sh
+```bash
 npm run lint
+```
+
+## Взаимодействие с backend API
+
+Для взаимодействия с API бэкенда используются сервисы из директории `src/services/`. В продакшн окружении необходимо настроить прокси в Nginx или другом веб-сервере для корректного перенаправления запросов к API.
+
+### Конфигурация прокси в режиме разработки
+
+В файле `vite.config.ts` настроено проксирование запросов для разработки:
+
+```typescript
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+      secure: false
+    },
+    '/auth': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+      secure: false
+    },
+    '/debug': {
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+      secure: false
+    }
+  }
+}
 ```
