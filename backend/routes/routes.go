@@ -89,6 +89,13 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 	{
 		api.GET("/profile", userController.GetProfile)
 
+		// Маршруты для управления пользователями (только для менеджеров)
+		users := api.Group("/users")
+		{
+			users.GET("", middleware.RoleMiddleware(models.RoleManager), userController.GetAllUsers)
+			users.PUT("/:id/role", middleware.RoleMiddleware(models.RoleManager), userController.UpdateUserRole)
+		}
+
 		projects := api.Group("/projects")
 		{
 			projects.GET("", projectController.GetAllProjects)

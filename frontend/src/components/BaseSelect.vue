@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
+  (e: 'change', value: string): void
 }>()
 </script>
 
@@ -28,7 +29,11 @@ const emit = defineEmits<{
       :value="modelValue"
       :required="required"
       :disabled="disabled"
-      @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
+      @change="(e) => {
+        const value = (e.target as HTMLSelectElement).value;
+        emit('update:modelValue', value);
+        emit('change', value);
+      }"
     >
       <option value="" disabled selected v-if="placeholder">{{ placeholder }}</option>
       <option v-for="option in options" :key="option.value" :value="option.value">

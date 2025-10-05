@@ -159,3 +159,88 @@ func (uc *UserController) GetProfile(c *gin.Context) {
 		},
 	})
 }
+
+// получение списка всех пользователей (только для менеджеров)
+func (uc *UserController) GetAllUsers(c *gin.Context) {
+	// Проверка роли выполняется в middleware
+
+	var users []models.User
+	if result := uc.DB.Find(&users); result.Error != nil {
+		log.Printf("Ошибка при получении списка пользователей: %v", result.Error)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении списка пользователей"})
+		return
+	}
+
+	// Создаем безопасные для передачи объекты (без хешей паролей)
+	safeUsers := make([]gin.H, len(users))
+	for i, user := range users {
+		safeUsers[i] = gin.H{
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"full_name":  user.FullName,
+			"role":       user.Role,
+			"created_at": user.CreatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users": safeUsers,
+		"count": len(users),
+	})
+}
+
+// обновление роли пользователя (только для менеджеров)
+func (uc *UserController) UpdateUserRole(c *gin.Context) {
+	// Проверка роли выполняется в middleware
+
+	userID := c.Param("id")
+
+	var roleUpdate struct {
+		Role string `json:"role" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&roleUpdate); err != nil {
+		log.Printf("Ошибка при разборе JSON запроса обновления роли: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Проверка, что роль допустима
+	if roleUpdate.Role != string(models.RoleManager) &&
+		roleUpdate.Role != string(models.RoleEngineer) &&
+		roleUpdate.Role != string(models.RoleObserver) {
+		log.Printf("Недопустимая роль: %s", roleUpdate.Role)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "недопустимая роль"})
+		return
+	}
+
+	// Поиск пользователя
+	var user models.User
+	if result := uc.DB.First(&user, userID); result.Error != nil {
+		log.Printf("Пользователь для обновления роли не найден: ID=%s", userID)
+		c.JSON(http.StatusNotFound, gin.H{"error": "пользователь не найден"})
+		return
+	}
+
+	// Обновление роли
+	user.Role = models.Role(roleUpdate.Role)
+	if result := uc.DB.Save(&user); result.Error != nil {
+		log.Printf("Ошибка при обновлении роли пользователя: %v", result.Error)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при обновлении роли пользователя"})
+		return
+	}
+
+	log.Printf("Роль пользователя %s (ID=%d) изменена на %s", user.Username, user.ID, user.Role)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "роль пользователя успешно обновлена",
+		"user": gin.H{
+			"id":        user.ID,
+			"username":  user.Username,
+			"email":     user.Email,
+			"full_name": user.FullName,
+			"role":      user.Role,
+		},
+	})
+}

@@ -4,14 +4,9 @@ import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseSelect from '../components/BaseSelect.vue'
 import BaseButton from '../components/BaseButton.vue'
+import { userService, User } from '../services/userService'
 
-interface User {
-  id: number
-  username: string
-  email: string
-  fullName: string
-  role: string
-}
+// Используем интерфейс User из userService.ts
 
 const users = ref<User[]>([])
 const isLoading = ref(true)
@@ -23,49 +18,68 @@ const roleOptions = [
   { value: 'observer', label: 'Наблюдатель' }
 ]
 
-// Имитация загрузки пользователей с сервера
+// Загрузка списка пользователей с сервера
 onMounted(async () => {
   try {
-    // В дальнейшем заменить на реальный API запрос
-    setTimeout(() => {
-      users.value = [
-        { 
-          id: 1, 
-          username: 'manager1', 
-          email: 'manager@example.com', 
-          fullName: 'Иванов Иван Иванович', 
-          role: 'manager' 
-        },
-        { 
-          id: 2, 
-          username: 'engineer1', 
-          email: 'engineer@example.com', 
-          fullName: 'Петров Петр Петрович', 
-          role: 'engineer' 
-        },
-        { 
-          id: 3, 
-          username: 'observer1', 
-          email: 'observer@example.com', 
-          fullName: 'Сидоров Сидор Сидорович', 
-          role: 'observer' 
-        }
-      ]
-      isLoading.value = false
-    }, 1000)
+    isLoading.value = true
+    users.value = await userService.getAllUsers()
+    isLoading.value = false
   } catch (err) {
     console.error('Ошибка при загрузке пользователей:', err)
-    error.value = 'Не удалось загрузить список пользователей'
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить список пользователей'
     isLoading.value = false
   }
 })
 
-const updateUserRole = (userId: number, newRole: string) => {
-  // В дальнейшем заменить на реальный API запрос
-  const user = users.value.find(u => u.id === userId)
-  if (user) {
-    user.role = newRole
-    console.log(`Роль пользователя ${user.username} изменена на ${newRole}`)
+// Обновление роли пользователя
+const isUpdating = ref(false)
+const updateError = ref('')
+
+const updateUserRole = async (userId: number, newRole: string) => {
+  try {
+    isUpdating.value = true
+    updateError.value = ''
+
+    // Отправляем запрос на обновление роли
+    const updatedUser = await userService.updateUserRole(userId, newRole)
+    
+    // Обновляем пользователя в списке
+    const index = users.value.findIndex(u => u.id === userId)
+    if (index !== -1) {
+      users.value[index] = {
+        ...users.value[index],
+        role: updatedUser.role
+      }
+    }
+    
+    console.log(`Роль пользователя ${updatedUser.username} изменена на ${updatedUser.role}`)
+  } catch (err) {
+    console.error('Ошибка при обновлении роли:', err)
+    updateError.value = err instanceof Error ? err.message : 'Ошибка при обновлении роли пользователя'
+    
+    // Отменяем изменение роли в UI при ошибке
+    const user = users.value.find(u => u.id === userId)
+    if (user) {
+      // Здесь мы должны вернуть предыдущее значение роли
+      // Но поскольку мы его не сохраняли, придется перезагрузить список
+      loadUsers()
+    }
+  } finally {
+    isUpdating.value = false
+  }
+}
+
+// Функция для загрузки пользователей
+const loadUsers = async () => {
+  try {
+    isLoading.value = true
+    users.value = await userService.getAllUsers()
+    error.value = ''
+  } catch (err) {
+    console.error('Ошибка при загрузке пользователей:', err)
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить список пользователей'
+  } finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -96,7 +110,7 @@ const updateUserRole = (userId: number, newRole: string) => {
             <tr v-for="user in users" :key="user.id">
               <td>{{ user.username }}</td>
               <td>{{ user.email }}</td>
-              <td>{{ user.fullName }}</td>
+              <td>{{ user.full_name }}</td>
               <td>
                 <BaseSelect
                   v-model="user.role"
@@ -105,7 +119,16 @@ const updateUserRole = (userId: number, newRole: string) => {
                 />
               </td>
               <td class="actions-cell">
-                <BaseButton size="small">Редактировать</BaseButton>
+                <div v-if="updateError && updateError.includes(String(user.id))" class="error-message">
+                  {{ updateError }}
+                </div>
+                <BaseButton 
+                  size="small" 
+                  :disabled="isUpdating" 
+                  @click="loadUsers"
+                >
+                  Обновить
+                </BaseButton>
               </td>
             </tr>
           </tbody>
