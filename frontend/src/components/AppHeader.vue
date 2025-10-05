@@ -1,8 +1,53 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuth } from '../composables/useAuth'
+import { onMounted, ref, watch } from 'vue'
 
-const isLoggedIn = ref(false)
+const router = useRouter()
+const { logout, isAuthenticated: authStatus, isManager: managerStatus, authService } = useAuth()
+const isAuthenticated = ref(authStatus.value)
+const isManager = ref(managerStatus.value)
+
+// Обновление состояния аутентификации при монтировании компонента
+onMounted(() => {
+  checkAuthentication()
+  
+  // Слушаем глобальное событие изменения авторизации
+  window.addEventListener('auth-change', () => {
+    console.log('Получено событие изменения авторизации')
+    checkAuthentication()
+  })
+})
+
+// Обновление при изменении маршрута
+watch(() => router.currentRoute.value.path, () => {
+  checkAuthentication()
+})
+
+function checkAuthentication() {
+  // Проверяем текущее состояние авторизации
+  const isLoggedIn = authService.isLoggedIn()
+  console.log('Проверка авторизации:', isLoggedIn)
+  isAuthenticated.value = isLoggedIn
+  
+  if (isLoggedIn) {
+    const user = authService.getCurrentUser()
+    console.log('Текущий пользователь:', user)
+    isManager.value = user?.role === 'manager'
+  } else {
+    isManager.value = false
+  }
+}
+
+const handleLogout = () => {
+  logout()
+  // Создаем событие выхода
+  const logoutEvent = new CustomEvent('auth-change', { detail: { action: 'logout' } })
+  window.dispatchEvent(logoutEvent)
+  
+  // Перенаправляем на страницу входа
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -13,17 +58,26 @@ const isLoggedIn = ref(false)
       </div>
       <nav class="main-nav">
         <ul class="nav-list">
-          <li v-if="isLoggedIn">
+          <li v-if="isAuthenticated">
             <RouterLink to="/projects">Проекты</RouterLink>
           </li>
-          <li v-if="isLoggedIn">
+          <li v-if="isAuthenticated">
             <RouterLink to="/defects">Дефекты</RouterLink>
           </li>
-          <li v-if="isLoggedIn">
+          <li v-if="isAuthenticated && isManager">
             <RouterLink to="/reports">Отчеты</RouterLink>
           </li>
-          <li v-if="isLoggedIn">
-            <button class="btn-outline">Выйти</button>
+          <li v-if="isAuthenticated && isManager">
+            <RouterLink to="/users">Пользователи</RouterLink>
+          </li>
+          <li v-if="!isAuthenticated">
+            <RouterLink to="/login">Войти</RouterLink>
+          </li>
+          <li v-if="!isAuthenticated">
+            <RouterLink to="/register">Регистрация</RouterLink>
+          </li>
+          <li v-if="isAuthenticated">
+            <button class="logout-button" @click="handleLogout">Выйти</button>
           </li>
         </ul>
       </nav>
@@ -60,6 +114,23 @@ const isLoggedIn = ref(false)
 .nav-list a:hover,
 .nav-list a.router-link-active {
   color: var(--color-primary);
+}
+
+.logout-button {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #f0f0f0;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 @media (max-width: 768px) {

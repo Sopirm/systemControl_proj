@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"systemControl_proj/config"
 	"systemControl_proj/database"
@@ -34,6 +35,10 @@ func (uc *UserController) Register(c *gin.Context) {
 		return
 	}
 
+	// Отладочная информация
+	log.Printf("Получен запрос на регистрацию: username=%s, email=%s, role=%s",
+		userReg.Username, userReg.Email, userReg.Role)
+
 	// проверка, что пользователь с таким именем не существует
 	var existingUser models.User
 	if result := uc.DB.Where("username = ? OR email = ?", userReg.Username, userReg.Email).First(&existingUser); result.Error == nil {
@@ -57,11 +62,17 @@ func (uc *UserController) Register(c *gin.Context) {
 		Role:         userReg.Role,
 	}
 
+	log.Printf("Создание пользователя: %+v", user)
+
 	// Сохранение пользователя в базе данных
 	if result := uc.DB.Create(&user); result.Error != nil {
+		log.Printf("Ошибка при сохранении пользователя: %v", result.Error)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при сохранении пользователя"})
 		return
 	}
+
+	log.Printf("Пользователь успешно создан: ID=%d, username=%s, role=%s",
+		user.ID, user.Username, user.Role)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "пользователь успешно зарегистрирован",
@@ -79,22 +90,31 @@ func (uc *UserController) Login(c *gin.Context) {
 	var userLogin models.UserLogin
 
 	if err := c.ShouldBindJSON(&userLogin); err != nil {
+		log.Printf("Ошибка при разборе JSON запроса: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Поиск пользователя по имени
+	log.Printf("Попытка входа пользователя: %s", userLogin.Username)
+
+	// Поиск пользователя по имени пользователя или email
 	var user models.User
-	if result := uc.DB.Where("username = ?", userLogin.Username).First(&user); result.Error != nil {
+	if result := uc.DB.Where("username = ? OR email = ?", userLogin.Username, userLogin.Username).First(&user); result.Error != nil {
+		log.Printf("Пользователь не найден: %s, ошибка: %v", userLogin.Username, result.Error)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
 		return
 	}
 
+	log.Printf("Пользователь найден: %s, email: %s, ID: %d, роль: %s", user.Username, user.Email, user.ID, user.Role)
+
 	// Проверка пароля
 	if err := user.CheckPassword(userLogin.Password); err != nil {
+		log.Printf("Неверный пароль для пользователя %s: %v", userLogin.Username, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
 		return
 	}
+
+	log.Printf("Пароль верный для пользователя: %s", userLogin.Username)
 
 	// Создание JWT токена
 	token, err := middleware.GenerateToken(&user, uc.Config)

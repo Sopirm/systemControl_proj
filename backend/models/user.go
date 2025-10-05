@@ -1,6 +1,7 @@
 package models
 
 import (
+	"log"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -39,17 +40,29 @@ type UserRegistration struct {
 
 // данные для входа пользователя
 type UserLogin struct {
-	Username string `json:"username" binding:"required"`
+	Username string `json:"username" binding:"required"` // Username может быть именем пользователя или email
 	Password string `json:"password" binding:"required"`
 }
 
 // хеширует пароль пользователя используя bcrypt
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(bytes), err
+	if err != nil {
+		log.Printf("Ошибка хеширования пароля: %v", err)
+		return "", err
+	}
+	log.Printf("Пароль успешно хеширован, длина хеша: %d", len(string(bytes)))
+	return string(bytes), nil
 }
 
 // проверяет пароль пользователя
 func (user *User) CheckPassword(password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	log.Printf("Проверка пароля, длина хеша в БД: %d", len(user.PasswordHash))
+	err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
+	if err != nil {
+		log.Printf("Ошибка сравнения пароля: %v", err)
+	} else {
+		log.Printf("Пароли совпадают")
+	}
+	return err
 }

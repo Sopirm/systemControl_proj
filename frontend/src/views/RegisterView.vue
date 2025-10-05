@@ -4,19 +4,29 @@ import { useRouter } from 'vue-router'
 import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseButton from '../components/BaseButton.vue'
+import BaseSelect from '../components/BaseSelect.vue'
+import { authService } from '../services/api'
 
 const router = useRouter()
 const fullName = ref('')
+const username = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
+const role = ref('')
 const error = ref('')
 const isLoading = ref(false)
+
+const roleOptions = [
+  { value: 'manager', label: 'Менеджер' },
+  { value: 'engineer', label: 'Инженер' },
+  { value: 'observer', label: 'Наблюдатель' }
+]
 
 const handleRegister = async () => {
   error.value = ''
   
-  if (!fullName.value || !email.value || !password.value || !confirmPassword.value) {
+  if (!fullName.value || !username.value || !email.value || !password.value || !confirmPassword.value || !role.value) {
     error.value = 'Пожалуйста, заполните все поля'
     return
   }
@@ -29,21 +39,22 @@ const handleRegister = async () => {
   isLoading.value = true
   
   try {
-    // Здесь будет реальный запрос к API
-    // Временная заглушка для демонстрации
-    setTimeout(() => {
-      console.log('Регистрация пользователя:', { 
-        fullName: fullName.value,
-        email: email.value
-      })
-      
-      // После успешной регистрации перенаправляем на страницу входа
-      router.push('/login')
-      
-      isLoading.value = false
-    }, 1000)
+    // Регистрация пользователя через API сервис
+    const response = await authService.register({
+      username: username.value,
+      full_name: fullName.value,
+      email: email.value,
+      password: password.value,
+      role: role.value
+    })
+    
+    console.log('Пользователь успешно зарегистрирован:', response.user)
+    
+    // После успешной регистрации перенаправляем на страницу входа
+    router.push('/login')
   } catch (err) {
-    error.value = 'Ошибка при регистрации'
+    console.error('Ошибка регистрации:', err)
+    error.value = err instanceof Error ? err.message : 'Ошибка при регистрации'
     isLoading.value = false
   }
 }
@@ -55,6 +66,13 @@ const handleRegister = async () => {
       <form @submit.prevent="handleRegister">
         <div v-if="error" class="alert alert-error">{{ error }}</div>
 
+        <BaseInput
+          v-model="username"
+          label="Имя пользователя"
+          placeholder="Введите имя пользователя"
+          required
+        />
+        
         <BaseInput
           v-model="fullName"
           label="ФИО"
@@ -83,6 +101,14 @@ const handleRegister = async () => {
           label="Подтверждение пароля"
           type="password"
           placeholder="Повторите пароль"
+          required
+        />
+        
+        <BaseSelect
+          v-model="role"
+          label="Роль в системе"
+          :options="roleOptions"
+          placeholder="Выберите вашу роль"
           required
         />
 

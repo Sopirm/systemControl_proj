@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
+import { authService } from '../services/api'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -47,22 +48,41 @@ const router = createRouter({
       path: '/reports',
       name: 'reports',
       component: () => import('../views/ReportsView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, requiredRole: 'manager' }
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: () => import('../views/UsersView.vue'),
+      meta: { requiresAuth: true, requiredRole: 'manager' }
     },
   ],
 })
 
-// Navigation guard для проверки авторизации
-// На данном этапе просто заглушка, потом будет реализована настоящая проверка
-// router.beforeEach((to, from, next) => {
-//   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-//   const isAuthenticated = false // Заглушка, пока нет реальной авторизации
+// Navigation guard для проверки авторизации и ролей
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const requiredRole = to.matched.some(record => record.meta.requiredRole) 
+    ? to.matched.find(record => record.meta.requiredRole)?.meta.requiredRole 
+    : null
+    
+  const isAuthenticated = authService.isLoggedIn()
+  const currentUser = authService.getCurrentUser()
 
-//   if (requiresAuth && !isAuthenticated) {
-//     next('/login')
-//   } else {
-//     next()
-//   }
-// })
+  // Проверка авторизации
+  if (requiresAuth && !isAuthenticated) {
+    next('/login')
+    return
+  }
+  
+  // Проверка роли пользователя
+  if (requiredRole && currentUser && currentUser.role !== requiredRole) {
+    // Если требуется определенная роль, но у пользователя она отсутствует
+    next('/') // Перенаправление на главную страницу
+    return
+  }
+  
+  next()
+})
 
 export default router

@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseButton from '../components/BaseButton.vue'
+import { authService } from '../services/api'
+import { useAuth } from '../composables/useAuth'
+
+// Создаем событие для оповещения о изменении состояния авторизации
+const authEvent = new CustomEvent('auth-change', { detail: { action: 'login' } })
 
 const router = useRouter()
-const email = ref('')
+const username = ref('')
 const password = ref('')
 const error = ref('')
 const isLoading = ref(false)
@@ -14,7 +19,7 @@ const isLoading = ref(false)
 const handleLogin = async () => {
   error.value = ''
   
-  if (!email.value || !password.value) {
+  if (!username.value || !password.value) {
     error.value = 'Пожалуйста, заполните все поля'
     return
   }
@@ -22,18 +27,23 @@ const handleLogin = async () => {
   isLoading.value = true
   
   try {
-    // Здесь будет реальный запрос к API
-    // Временная заглушка для демонстрации
-    setTimeout(() => {
-      console.log('Попытка входа:', { email: email.value, password: '***' })
-      
-      // После успешной авторизации перенаправляем на страницу проектов
-      router.push('/projects')
-      
-      isLoading.value = false
-    }, 1000)
+    // Авторизация пользователя через API сервис
+    const response = await authService.login({
+      username: username.value,
+      password: password.value
+    })
+    
+    console.log('Успешная авторизация:', response.user)
+    
+    // Обновляем состояние авторизации
+    window.dispatchEvent(authEvent)
+    
+    // После успешной авторизации перенаправляем на страницу проектов
+    await nextTick()
+    router.push('/projects')
   } catch (err) {
-    error.value = 'Ошибка при входе в систему'
+    console.error('Ошибка авторизации:', err)
+    error.value = err instanceof Error ? err.message : 'Ошибка при входе в систему'
     isLoading.value = false
   }
 }
@@ -46,10 +56,9 @@ const handleLogin = async () => {
         <div v-if="error" class="alert alert-error">{{ error }}</div>
 
         <BaseInput
-          v-model="email"
-          label="Email"
-          type="email"
-          placeholder="Введите ваш email"
+          v-model="username"
+          label="Имя пользователя или Email"
+          placeholder="Введите имя пользователя или email"
           required
         />
 

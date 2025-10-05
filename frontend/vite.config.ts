@@ -17,4 +17,26 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      // Настройка прокси для API-запросов
+      '/api': {
+        target: 'http://localhost:8080', // Порт, на котором работает Go-сервер
+        changeOrigin: true,
+        secure: false,
+      },
+      // Прокси для аутентификации
+      '/auth': {
+        target: 'http://localhost:8080', 
+        changeOrigin: true,
+        secure: false,
+      },
+      // Прокси для отладочных запросов
+      '/debug': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 })
