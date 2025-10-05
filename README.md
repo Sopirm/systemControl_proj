@@ -150,6 +150,23 @@ cd systemControl_proj
 
 ### 2. Запуск Backend (GoLang Gin)
 
+**2.1 Создание базы данных PostgreSQL**
+
+Перед запуском сервера и применением миграций необходимо создать базу данных `systemcontrol` в PostgreSQL. Вы можете сделать это одним из следующих способов:
+
+**С помощью `psql` (инструмент командной строки PostgreSQL):**
+```bash
+psql -U postgres -c "CREATE DATABASE systemcontrol;"
+```
+(Вам будет предложено ввести пароль для пользователя `postgres`.)
+
+**С помощью `createdb` (утилита PostgreSQL):**
+```bash
+createdb -U postgres systemcontrol
+```
+(Вам будет предложено ввести пароль для пользователя `postgres`.)
+
+**2.2 Установка зависимостей и запуск сервера**
 ```bash
 cd backend
 go mod tidy
@@ -202,5 +219,3 @@ systemControl_proj/
 ```
 
 ---
-
-Ссылка на GitHub: [https://github.com/Sopirm/systemControl_proj](https://github.com/Sopirm/systemControl_proj)
