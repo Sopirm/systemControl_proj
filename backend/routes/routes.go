@@ -61,6 +61,9 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		// маршруты для дефектов
 		defects := api.Group("/defects")
 		{
+			// комментарии к дефектам
+			defects.GET("/:id/comments", commentController.GetDefectComments)
+
 			defects.GET("", defectController.GetAllDefects)
 			defects.GET("/:id", defectController.GetDefect)
 			defects.POST("", defectController.CreateDefect)
@@ -68,7 +71,6 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 			defects.DELETE("/:id", middleware.RoleMiddleware(models.RoleManager, models.RoleEngineer), defectController.DeleteDefect)
 
 			// комментарии к дефектам
-			defects.GET("/:defect_id/comments", commentController.GetDefectComments)
 			defects.POST("/comments", commentController.CreateComment)
 			defects.DELETE("/comments/:id", commentController.DeleteComment)
 		}
