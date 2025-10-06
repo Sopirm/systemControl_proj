@@ -4,9 +4,10 @@ import { useAuth } from '../composables/useAuth'
 import { onMounted, ref, watch } from 'vue'
 
 const router = useRouter()
-const { logout, isAuthenticated: authStatus, isManager: managerStatus, authService } = useAuth()
+const { logout, isAuthenticated: authStatus, isManager: managerStatus, isObserver: observerStatus, authService } = useAuth()
 const isAuthenticated = ref(authStatus.value)
 const isManager = ref(managerStatus.value)
+const isObserver = ref(observerStatus.value)
 
 // Обновление состояния аутентификации при монтировании компонента
 onMounted(() => {
@@ -34,8 +35,10 @@ function checkAuthentication() {
     const user = authService.getCurrentUser()
     console.log('Текущий пользователь:', user)
     isManager.value = user?.role === 'manager'
+    isObserver.value = user?.role === 'observer'
   } else {
     isManager.value = false
+    isObserver.value = false
   }
 }
 
@@ -64,7 +67,7 @@ const handleLogout = () => {
           <li v-if="isAuthenticated">
             <RouterLink to="/defects">Дефекты</RouterLink>
           </li>
-          <li v-if="isAuthenticated && isManager">
+          <li v-if="isAuthenticated && (isManager || isObserver)">
             <RouterLink to="/reports">Отчеты</RouterLink>
           </li>
           <li v-if="isAuthenticated && isManager">

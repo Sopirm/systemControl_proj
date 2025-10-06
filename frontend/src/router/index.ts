@@ -60,7 +60,7 @@ const router = createRouter({
       path: '/reports',
       name: 'reports',
       component: () => import('../views/ReportsView.vue'),
-      meta: { requiresAuth: true, requiredRole: 'manager' }
+      meta: { requiresAuth: true, requiredRoles: ['manager', 'observer'] }
     },
     {
       path: '/users',
@@ -74,10 +74,16 @@ const router = createRouter({
 // Navigation guard для проверки авторизации и ролей
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-  const requiredRole = to.matched.some(record => record.meta.requiredRole) 
-    ? to.matched.find(record => record.meta.requiredRole)?.meta.requiredRole 
-    : null
-    
+
+  // Поддержка как requiredRole (string), так и requiredRoles (string[])
+  let allowedRoles: string[] | null = null
+  const metaWithRoles = to.matched.find(r => (r.meta as any).requiredRoles || (r.meta as any).requiredRole)?.meta as any
+  if (metaWithRoles?.requiredRoles) {
+    allowedRoles = metaWithRoles.requiredRoles as string[]
+  } else if (metaWithRoles?.requiredRole) {
+    allowedRoles = [metaWithRoles.requiredRole as string]
+  }
+
   const isAuthenticated = authService.isLoggedIn()
   const currentUser = authService.getCurrentUser()
 
@@ -95,9 +101,9 @@ router.beforeEach((to, from, next) => {
   }
   
   // Проверка роли пользователя
-  if (requiredRole && currentUser && currentUser.role !== requiredRole) {
-    // Если требуется определенная роль, но у пользователя она отсутствует
-    next('/projects') // Перенаправление на страницу проектов
+  if (allowedRoles && currentUser && !allowedRoles.includes(currentUser.role)) {
+    // Если роль не разрешена
+    next('/projects')
     return
   }
   
