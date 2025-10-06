@@ -2,19 +2,19 @@ package migrations
 
 import (
 	"log"
-
 	"gorm.io/gorm"
 )
 
 // возвращает список всех миграций в нужном порядке
 func GetMigrations() []Migrator {
-	return []Migrator{
-		&CreateUsersTable{},
-		&CreateProjectsTable{},
-		&CreateDefectsTable{},
-		&CreateCommentsTable{},
-		&AddIndices{},
-	}
+    return []Migrator{
+        &CreateUsersTable{},
+        &CreateProjectsTable{},
+        &CreateDefectsTable{},
+        &CreateCommentsTable{},
+        &AddIndices{},
+        &SeedAdminUser{},
+    }
 }
 
 // запускает все доступные миграции
