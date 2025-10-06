@@ -208,13 +208,81 @@ watch(selectedReport, async () => {
   // В некоторых случаях стили применяются кадром позже
   requestAnimationFrame(() => renderSelectedChart())
 })
+
+// ===== Export helpers =====
+type Row = { label: string; value: number }
+
+function getCurrentAgg(): { title: string; rows: Row[]; file: string; sheet: string } | null {
+  if (selectedReport.value === 'defects-by-status') {
+    const rows = statusAgg.value.labels.map((l, i) => ({ label: l, value: statusAgg.value.data[i] || 0 }))
+    return { title: 'Дефекты по статусам', rows, file: 'defects_by_status', sheet: 'ByStatus' }
+  }
+  if (selectedReport.value === 'defects-by-priority') {
+    const rows = priorityAgg.value.labels.map((l, i) => ({ label: l, value: priorityAgg.value.data[i] || 0 }))
+    return { title: 'Дефекты по приоритету', rows, file: 'defects_by_priority', sheet: 'ByPriority' }
+  }
+  if (selectedReport.value === 'defects-by-project') {
+    const rows = projectAgg.value.labels.map((l, i) => ({ label: l, value: projectAgg.value.data[i] || 0 }))
+    return { title: 'Дефекты по объектам', rows, file: 'defects_by_project', sheet: 'ByProject' }
+  }
+  return null
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+function exportCsv() {
+  const agg = getCurrentAgg()
+  if (!agg) return
+  const total = agg.rows.reduce((s, r) => s + r.value, 0)
+  if (total === 0) {
+    console.warn('Нет данных для экспорта CSV')
+    return
+  }
+  const sep = ';'
+  const header = ['Название', 'Количество']
+  const lines = [header.join(sep), ...agg.rows.map(r => [`"${r.label.replaceAll('"', '""')}"`, String(r.value)].join(sep))]
+  const csv = '\ufeff' + lines.join('\n')
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${agg.file}.csv`)
+}
+
+async function exportExcel() {
+  const agg = getCurrentAgg()
+  if (!agg) return
+  const total = agg.rows.reduce((s, r) => s + r.value, 0)
+  if (total === 0) {
+    console.warn('Нет данных для экспорта Excel')
+    return
+  }
+  // динамически импортируем xlsx, чтобы не раздувать бандл
+  const XLSX: any = await import('xlsx')
+  const aoa = [[agg.title], [], ['Название', 'Количество'], ...agg.rows.map(r => [r.label, r.value])]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, agg.sheet)
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  downloadBlob(new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${agg.file}.xlsx`)
+}
+
+function onExport() {
+  if (exportFormat.value === 'csv') return exportCsv()
+  return exportExcel()
+}
 </script>
 
 <template>
   <div class="reports-page">
     <div class="page-header flex-between">
       <h1>Отчеты</h1>
-      <BaseButton>Экспорт</BaseButton>
+      <BaseButton :disabled="isLoading" @click="onExport">Экспорт</BaseButton>
     </div>
 
     <div class="reports-container">
@@ -258,7 +326,7 @@ watch(selectedReport, async () => {
                 <input type="radio" v-model="exportFormat" value="csv"> CSV
               </label>
             </div>
-            <BaseButton variant="outline">Скачать</BaseButton>
+            <BaseButton variant="outline" :disabled="isLoading" @click="onExport">Скачать</BaseButton>
           </div>
         </div>
       </aside>
