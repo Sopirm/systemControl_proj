@@ -1,11 +1,213 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
+import { defectService, type Defect } from '../services/defectService'
+import { Chart, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, BarController, DoughnutController } from 'chart.js'
+Chart.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, BarController, DoughnutController)
+Chart.defaults.responsive = true
+Chart.defaults.maintainAspectRatio = false
 
-const selectedReport = ref('defects-by-status')
+const selectedReport = ref<'defects-by-status' | 'defects-by-priority' | 'defects-by-project'>('defects-by-status')
 const isLoading = ref(false)
-const exportFormat = ref('excel')
+const exportFormat = ref<'excel' | 'csv'>('excel')
+
+// Canvas refs
+const statusCanvas = ref<HTMLCanvasElement | null>(null)
+const priorityCanvas = ref<HTMLCanvasElement | null>(null)
+const projectCanvas = ref<HTMLCanvasElement | null>(null)
+
+// Chart instances
+let statusChart: Chart | null = null
+let priorityChart: Chart | null = null
+let projectChart: Chart | null = null
+
+// Data
+const defects = ref<Defect[]>([])
+const statusAgg = ref<{ labels: string[]; data: number[] }>({ labels: [], data: [] })
+const priorityAgg = ref<{ labels: string[]; data: number[] }>({ labels: [], data: [] })
+const projectAgg = ref<{ labels: string[]; data: number[] }>({ labels: [], data: [] })
+const sum = (arr: number[]) => arr.reduce((s, n) => s + n, 0)
+
+// Helpers for labels
+const statusLabel = (s: string) => ({
+  new: 'Новый',
+  in_progress: 'В работе',
+  review: 'На проверке',
+  closed: 'Закрыт',
+  cancelled: 'Отменен', // фронт
+  canceled: 'Отменен'   // бэк
+} as Record<string, string>)[s] || s
+
+const priorityLabel = (p: string) => ({
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий'
+} as Record<string, string>)[p] || p
+
+// Aggregations
+function aggregateByStatus(items: Defect[]) {
+  // Бэкенд использует 'canceled' (без второй L)
+  const keys = ['new', 'in_progress', 'review', 'closed', 'canceled']
+  const counts = keys.map(k => items.filter(d => d.status === k).length)
+  return { labels: keys.map(statusLabel), data: counts }
+}
+
+function aggregateByPriority(items: Defect[]) {
+  const keys = ['low', 'medium', 'high']
+  const counts = keys.map(k => items.filter(d => d.priority === k).length)
+  return { labels: keys.map(priorityLabel), data: counts }
+}
+
+function aggregateByProject(items: Defect[]) {
+  const map = new Map<string, number>()
+  for (const d of items) {
+    const name = d.project?.name || `Проект #${d.project_id}`
+    map.set(name, (map.get(name) || 0) + 1)
+  }
+  const labels = Array.from(map.keys())
+  const data = Array.from(map.values())
+  return { labels, data }
+}
+
+// Chart builders
+function buildStatusChart(ctx: CanvasRenderingContext2D, labels: string[], data: number[]) {
+  const chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Дефекты по статусу',
+        data,
+        backgroundColor: ['#e3f2fd', '#e8f5e9', '#fff3e0', '#f5f5f5', '#ffebee'],
+        borderColor: ['#1976d2', '#2e7d32', '#e65100', '#616161', '#c62828']
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  })
+  chart.resize();
+  chart.update();
+  return chart
+}
+
+function buildPriorityChart(ctx: CanvasRenderingContext2D, labels: string[], data: number[]) {
+  const chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Дефекты по приоритету',
+        data,
+        backgroundColor: ['#e8f5e9', '#fff3e0', '#ffebee'],
+        borderColor: ['#2e7d32', '#e65100', '#c62828']
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  })
+  chart.resize();
+  chart.update();
+  return chart
+}
+
+function buildProjectChart(ctx: CanvasRenderingContext2D, labels: string[], data: number[]) {
+  const chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Дефекты по объектам',
+        data,
+        backgroundColor: '#90caf9',
+        borderColor: '#1976d2'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  })
+  chart.resize();
+  chart.update();
+  return chart
+}
+
+function destroyCharts() {
+  statusChart?.destroy(); statusChart = null
+  priorityChart?.destroy(); priorityChart = null
+  projectChart?.destroy(); projectChart = null
+}
+
+function renderSelectedChart() {
+  // Перерисовываем только активный график, остальные уничтожаем
+  if (selectedReport.value === 'defects-by-status') {
+    priorityChart?.destroy(); priorityChart = null
+    projectChart?.destroy(); projectChart = null
+    if (statusCanvas.value && sum(statusAgg.value.data) > 0 && statusCanvas.value.offsetParent !== null) {
+      const ctx = statusCanvas.value.getContext('2d')!
+      statusChart?.destroy();
+      statusChart = buildStatusChart(ctx, statusAgg.value.labels, statusAgg.value.data)
+    }
+    return
+  }
+  if (selectedReport.value === 'defects-by-priority') {
+    statusChart?.destroy(); statusChart = null
+    projectChart?.destroy(); projectChart = null
+    if (priorityCanvas.value && sum(priorityAgg.value.data) > 0 && priorityCanvas.value.offsetParent !== null) {
+      const ctx = priorityCanvas.value.getContext('2d')!
+      priorityChart?.destroy();
+      priorityChart = buildPriorityChart(ctx, priorityAgg.value.labels, priorityAgg.value.data)
+    }
+    return
+  }
+  if (selectedReport.value === 'defects-by-project') {
+    statusChart?.destroy(); statusChart = null
+    priorityChart?.destroy(); priorityChart = null
+    if (projectCanvas.value && sum(projectAgg.value.data) > 0 && projectCanvas.value.offsetParent !== null) {
+      const ctx = projectCanvas.value.getContext('2d')!
+      projectChart?.destroy();
+      projectChart = buildProjectChart(ctx, projectAgg.value.labels, projectAgg.value.data)
+    }
+  }
+}
+
+async function loadAndRender() {
+  isLoading.value = true
+  try {
+    defects.value = await defectService.getAllDefects()
+    const byStatus = aggregateByStatus(defects.value)
+    const byPriority = aggregateByPriority(defects.value)
+    const byProject = aggregateByProject(defects.value)
+    statusAgg.value = byStatus
+    priorityAgg.value = byPriority
+    projectAgg.value = byProject
+    // Перерисовываем только активный график, когда DOM обновлен и контейнер видим
+    await nextTick()
+    // debug размеров контейнера
+    const container = selectedReport.value === 'defects-by-status' ? statusCanvas.value?.parentElement
+      : selectedReport.value === 'defects-by-priority' ? priorityCanvas.value?.parentElement
+      : projectCanvas.value?.parentElement
+    console.debug('ReportsView agg:', { byStatus, byPriority, byProject, size: { w: container?.clientWidth, h: container?.clientHeight } })
+    requestAnimationFrame(() => renderSelectedChart())
+  } catch (e) {
+    console.error('Ошибка загрузки данных отчетов:', e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadAndRender()
+})
+
+onBeforeUnmount(() => destroyCharts())
+
+// Перерисовка при переключении вкладок отчета, чтобы избегать отрисовки в скрытом контейнере
+watch(selectedReport, async () => {
+  await nextTick()
+  // В некоторых случаях стили применяются кадром позже
+  requestAnimationFrame(() => renderSelectedChart())
+})
 </script>
 
 <template>
@@ -43,14 +245,6 @@ const exportFormat = ref('excel')
               Дефекты по объектам
             </button>
           </li>
-          <li>
-            <button 
-              :class="{ active: selectedReport === 'completion-rate' }"
-              @click="selectedReport = 'completion-rate'"
-            >
-              Степень готовности объектов
-            </button>
-          </li>
         </ul>
 
         <div class="export-section">
@@ -72,20 +266,34 @@ const exportFormat = ref('excel')
       <div class="report-content">
         <BaseCard :title="selectedReport === 'defects-by-status' ? 'Дефекты по статусам' : 
                           selectedReport === 'defects-by-priority' ? 'Дефекты по приоритету' : 
-                          selectedReport === 'defects-by-project' ? 'Дефекты по объектам' : 
-                          'Степень готовности объектов'">
+                          'Дефекты по объектам'">
           <div v-if="isLoading" class="loading-indicator">
             Загрузка данных...
           </div>
           <div v-else>
-            <!-- Здесь будет содержимое выбранного отчета -->
-            <div class="report-placeholder">
-              <p>Диаграмма для выбранного отчета будет отображена здесь</p>
-              <div class="placeholder-chart"></div>
-              <p class="placeholder-text">
-                В будущих версиях здесь будут интерактивные графики, отображающие аналитические данные 
-                по дефектам и объектам строительства.
-              </p>
+            <div v-show="selectedReport === 'defects-by-status'" class="chart-container">
+              <template v-if="sum(statusAgg.data) > 0">
+                <canvas ref="statusCanvas"></canvas>
+              </template>
+              <template v-else>
+                <div class="report-placeholder"><p class="placeholder-text">Нет данных для отображения</p></div>
+              </template>
+            </div>
+            <div v-show="selectedReport === 'defects-by-priority'" class="chart-container">
+              <template v-if="sum(priorityAgg.data) > 0">
+                <canvas ref="priorityCanvas"></canvas>
+              </template>
+              <template v-else>
+                <div class="report-placeholder"><p class="placeholder-text">Нет данных для отображения</p></div>
+              </template>
+            </div>
+            <div v-show="selectedReport === 'defects-by-project'" class="chart-container">
+              <template v-if="sum(projectAgg.data) > 0">
+                <canvas ref="projectCanvas"></canvas>
+              </template>
+              <template v-else>
+                <div class="report-placeholder"><p class="placeholder-text">Нет данных для отображения</p></div>
+              </template>
             </div>
           </div>
         </BaseCard>
@@ -169,6 +377,18 @@ h3 {
   min-height: 400px;
 }
 
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 380px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
 .export-section {
   padding-top: 1rem;
   border-top: 1px solid var(--color-border);
@@ -199,27 +419,6 @@ h3 {
   padding: 2rem 1rem;
 }
 
-.placeholder-chart {
-  height: 200px;
-  background-color: #f5f5f5;
-  border-radius: var(--border-radius);
-  margin: 1.5rem auto;
-  position: relative;
-}
-
-.placeholder-chart:after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100px;
-  height: 100px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%231e90ff'%3E%3Cpath d='M3 13h2v7c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-7h2v-2H3v2zm4 7v-9h10v9H7zm6-11V7H11v2H9V5h2V3h2v2h2v2h-2z'%3E%3C/path%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  opacity: 0.2;
-}
 
 .placeholder-text {
   color: var(--color-text-light);
