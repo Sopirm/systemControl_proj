@@ -2,31 +2,19 @@
 import { onMounted, onUnmounted } from 'vue'
 import BaseButton from './BaseButton.vue'
 
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: false
-  },
-  title: {
-    type: String,
-    default: 'Подтверждение'
-  },
-  message: {
-    type: String,
-    required: true
-  },
-  confirmText: {
-    type: String,
-    default: 'Подтвердить'
-  },
-  cancelText: {
-    type: String,
-    default: 'Отмена'
-  },
-  confirmVariant: {
-    type: String,
-    default: 'danger'
-  }
+const props = withDefaults(defineProps<{
+  show?: boolean
+  title?: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  confirmVariant?: 'primary' | 'outline' | 'text' | 'danger'
+}>(), {
+  show: false,
+  title: 'Подтверждение',
+  confirmText: 'Подтвердить',
+  cancelText: 'Отмена',
+  confirmVariant: 'danger'
 })
 
 const emit = defineEmits(['confirm', 'cancel'])

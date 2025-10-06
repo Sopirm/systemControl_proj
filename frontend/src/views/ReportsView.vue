@@ -324,6 +324,11 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+// CSV escape for quotes (compatible with older JS targets)
+function csvEsc(val: any): string {
+  return '"' + String(val).replace(/"/g, '""') + '"'
+}
+
 function exportCsv() {
   const agg = getCurrentAgg()
   if (!agg) return
@@ -334,7 +339,7 @@ function exportCsv() {
   }
   const sep = ';'
   const header = ['Название', 'Количество']
-  const lines = [header.join(sep), ...agg.rows.map(r => [`"${r.label.replaceAll('"', '""')}"`, String(r.value)].join(sep))]
+  const lines = [header.join(sep), ...agg.rows.map(r => [csvEsc(r.label), String(r.value)].join(sep))]
   const csv = '\ufeff' + lines.join('\n')
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `${agg.file}.csv`)
 }
@@ -363,8 +368,7 @@ function exportOverviewCsv() {
     console.warn('Нет данных для экспорта CSV (overview)')
     return
   }
-  const esc = (v: any) => `"${String(v).replaceAll('"', '""')}"`
-  const lines = [header.join(sep), ...rows.map(r => r.map(esc).join(sep))]
+  const lines = [header.join(sep), ...rows.map(r => r.map(csvEsc).join(sep))]
   const csv = '\ufeff' + lines.join('\n')
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), `Общий_отчет_проекты_дефекты.csv`)
 }

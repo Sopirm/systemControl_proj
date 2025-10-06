@@ -1,0 +1,26 @@
+# Global dockerignore for repo-level build contexts
+.git
+.gitignore
+**/.DS_Store
+**/.env
+.env
+
+# Node artifacts
+frontend/node_modules
+**/node_modules
+frontend/dist
+
+# Editor/IDE
+**/.vscode
+**/.idea
+
+# Logs and coverage
+**/*.log
+**/coverage
+
+# Go build cache and binaries
+**/bin
+**/tmp
+**/vendor
+backend/migrate
+backend/server

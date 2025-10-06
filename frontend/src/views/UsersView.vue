@@ -4,7 +4,8 @@ import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseSelect from '../components/BaseSelect.vue'
 import BaseButton from '../components/BaseButton.vue'
-import { userService, User } from '../services/userService'
+import { userService } from '../services/userService'
+import type { User } from '../services/userService'
 import { useAuth } from '../composables/useAuth'
 
 // Используем интерфейс User из userService.ts
@@ -133,7 +134,7 @@ const loadUsers = async () => {
                 <BaseSelect
                   v-model="user.role"
                   :options="roleOptions"
-                  :disabled="isUpdating || (currentUser && user.id === currentUser.id)"
+                  :disabled="isUpdating || (currentUser?.id === user.id)"
                   @change="updateUserRole(user.id, user.role)"
                 />
               </td>
