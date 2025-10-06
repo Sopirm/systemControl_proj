@@ -89,7 +89,13 @@ func (dc *DefectController) GetAllDefects(c *gin.Context) {
 	var defects []models.Defect
 
 	// получение параметров запроса для фильтрации
-	projectID := c.Query("project_id")
+	// Сначала проверяем параметр из URL пути (для маршрута /projects/:id/defects)
+	projectID := c.Param("id")
+	// Если параметра в пути нет, проверяем query-параметр
+	if projectID == "" {
+		projectID = c.Query("project_id")
+	}
+
 	status := c.Query("status")
 	priority := c.Query("priority")
 	assigneeID := c.Query("assignee_id")

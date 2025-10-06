@@ -1,15 +1,18 @@
 <script setup lang="ts">
-defineProps<{
-  defect: {
-    id: number
-    title: string
-    description: string
-    priority: 'low' | 'medium' | 'high'
-    status: 'new' | 'in_progress' | 'review' | 'closed' | 'cancelled'
-    assignee?: string
-    dueDate?: string
-  }
+import { computed } from 'vue'
+import type { Defect } from '../services/defectService'
+
+const props = defineProps<{
+  defect: Defect
 }>()
+
+// Форматирование даты
+const formatDate = (dateString?: string) => {
+  if (!dateString) return 'Не указана'
+  
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('ru-RU').format(date)
+}
 
 const getStatusClass = (status: string) => {
   const statusMap: Record<string, string> = {
@@ -41,6 +44,20 @@ const getStatusLabel = (status: string) => {
   }
   return statusLabels[status] || 'Новый'
 }
+
+const getPriorityLabel = (priority: string) => {
+  const priorityLabels: Record<string, string> = {
+    low: 'Низкий',
+    medium: 'Средний',
+    high: 'Высокий'
+  }
+  return priorityLabels[priority] || 'Средний'
+}
+
+// Вычисляемое свойство для имени исполнителя
+const assigneeName = computed(() => {
+  return props.defect.assignee?.full_name || 'Не назначен'
+})
 </script>
 
 <template>
@@ -52,19 +69,19 @@ const getStatusLabel = (status: string) => {
           {{ getStatusLabel(defect.status) }}
         </span>
         <span class="badge priority-badge" :class="getPriorityClass(defect.priority)">
-          {{ defect.priority === 'low' ? 'Низкий' : defect.priority === 'medium' ? 'Средний' : 'Высокий' }}
+          {{ getPriorityLabel(defect.priority) }}
         </span>
       </div>
     </div>
     <p class="defect-description">{{ defect.description }}</p>
     <div class="defect-details">
-      <div v-if="defect.assignee" class="detail-item">
+      <div class="detail-item">
         <span class="detail-label">Исполнитель:</span>
-        <span class="detail-value">{{ defect.assignee }}</span>
+        <span class="detail-value">{{ assigneeName }}</span>
       </div>
-      <div v-if="defect.dueDate" class="detail-item">
+      <div v-if="defect.due_date" class="detail-item">
         <span class="detail-label">Срок:</span>
-        <span class="detail-value">{{ defect.dueDate }}</span>
+        <span class="detail-value">{{ formatDate(defect.due_date) }}</span>
       </div>
     </div>
     <div class="defect-actions">

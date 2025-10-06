@@ -100,6 +100,7 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		{
 			projects.GET("", projectController.GetAllProjects)
 			projects.GET("/:id", projectController.GetProject)
+			projects.GET("/:id/defects", defectController.GetAllDefects)
 			projects.POST("", middleware.RoleMiddleware(models.RoleManager), projectController.CreateProject)
 			projects.PUT("/:id", middleware.RoleMiddleware(models.RoleManager), projectController.UpdateProject)
 			projects.DELETE("/:id", middleware.RoleMiddleware(models.RoleManager), projectController.DeleteProject)

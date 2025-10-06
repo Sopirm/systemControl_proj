@@ -19,10 +19,11 @@ const loadDefectStats = async (projectId: number) => {
   try {
     const stats = await defectService.getDefectStatsByProjectId(projectId)
     projectDefectStats.value[projectId] = stats
+    console.log(`Статистика дефектов для проекта ${projectId}:`, stats)
   } catch (err) {
     console.error(`Ошибка при загрузке статистики дефектов для проекта ${projectId}:`, err)
-    // Используем демо-данные в случае ошибки
-    projectDefectStats.value[projectId] = defectService.generateDemoDefectStats(projectId)
+    // В случае ошибки устанавливаем нулевые значения
+    projectDefectStats.value[projectId] = { active: 0, resolved: 0, total: 0 }
   }
 }
 

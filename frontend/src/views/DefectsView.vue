@@ -1,70 +1,40 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import DefectItem from '../components/DefectItem.vue'
 import BaseButton from '../components/BaseButton.vue'
+import CreateDefectModal from '../components/CreateDefectModal.vue'
+import { defectService, type Defect } from '../services/defectService'
+import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
+const { isManager, isEngineer } = useAuth()
+const defects = ref<Defect[]>([])
+const isLoading = ref(true)
+const error = ref('')
+const filterStatus = ref('all')
+const showCreateDefectModal = ref(false)
 
-interface Defect {
-  id: number
-  title: string
-  description: string
-  priority: 'low' | 'medium' | 'high'
-  status: 'new' | 'in_progress' | 'review' | 'closed' | 'cancelled'
-  project: {
-    id: number
-    name: string
+// Получаем права доступа
+const permissions = defectService.checkPermissions()
+
+// Загрузка всех дефектов
+const loadDefects = async () => {
+  try {
+    isLoading.value = true
+    error.value = ''
+    const data = await defectService.getAllDefects()
+    defects.value = data
+    console.log('Загружено дефектов:', data.length)
+  } catch (err) {
+    console.error('Ошибка при загрузке дефектов:', err)
+    error.value = err instanceof Error ? err.message : 'Не удалось загрузить дефекты'
+  } finally {
+    isLoading.value = false
   }
-  assignee?: string
-  dueDate?: string
 }
 
-// Временные данные для демонстрации
-const defects = ref<Defect[]>([
-  {
-    id: 1,
-    title: 'Трещина в несущей стене',
-    description: 'На 3 этаже, 2 подъезд обнаружена трещина в несущей стене размером 1.5м',
-    priority: 'high',
-    status: 'new',
-    project: {
-      id: 1,
-      name: 'ЖК "Солнечный"'
-    },
-    assignee: 'Иванов И.И.',
-    dueDate: '2023-10-15'
-  },
-  {
-    id: 2,
-    title: 'Протечка в потолке',
-    description: 'Кв. 42, 5 этаж - следы протечки на потолке в ванной комнате',
-    priority: 'medium',
-    status: 'in_progress',
-    project: {
-      id: 1,
-      name: 'ЖК "Солнечный"'
-    },
-    assignee: 'Петров П.П.'
-  },
-  {
-    id: 3,
-    title: 'Неправильная укладка плитки',
-    description: 'Холл 1 этажа - неровная укладка напольной плитки на площади 5м²',
-    priority: 'low',
-    status: 'review',
-    project: {
-      id: 2,
-      name: 'Бизнес-центр "Меркурий"'
-    },
-    assignee: 'Сидоров С.С.',
-    dueDate: '2023-10-10'
-  }
-])
-
-const isLoading = ref(false)
-const filterStatus = ref('all')
-
+// Фильтрация дефектов по статусу
 const filteredDefects = computed(() => {
   if (filterStatus.value === 'all') {
     return defects.value
@@ -72,16 +42,48 @@ const filteredDefects = computed(() => {
   return defects.value.filter(defect => defect.status === filterStatus.value)
 })
 
+// Открытие страницы дефекта
 function openDefect(id: number) {
   router.push(`/defects/${id}`)
 }
+
+// Открытие модального окна создания дефекта
+const openCreateDefectModal = () => {
+  showCreateDefectModal.value = true
+}
+
+// Закрытие модального окна создания дефекта
+const closeCreateDefectModal = () => {
+  showCreateDefectModal.value = false
+}
+
+// Обработка создания дефекта
+const handleDefectCreated = (defect: Defect) => {
+  // Добавляем новый дефект в список
+  defects.value.push(defect)
+  
+  // Закрываем модальное окно
+  closeCreateDefectModal()
+}
+
+// Загрузка дефектов при монтировании компонента
+onMounted(() => {
+  loadDefects()
+})
 </script>
 
 <template>
   <div class="defects-page">
+    <div v-if="error" class="alert alert-error">{{ error }}</div>
+    
     <div class="page-header flex-between">
       <h1>Дефекты</h1>
-      <BaseButton>Создать дефект</BaseButton>
+      <BaseButton 
+        v-if="permissions.canCreate" 
+        @click="openCreateDefectModal"
+      >
+        Создать дефект
+      </BaseButton>
     </div>
 
     <div class="filters">
@@ -109,13 +111,22 @@ function openDefect(id: number) {
         v-for="defect in filteredDefects" 
         :key="defect.id" 
         :defect="defect"
-        @click="openDefect(defect.id)"
       >
         <template #actions>
-          <BaseButton variant="outline">Подробнее</BaseButton>
+          <RouterLink :to="`/defects/${defect.id}`">
+            <BaseButton variant="outline">Подробнее</BaseButton>
+          </RouterLink>
         </template>
       </DefectItem>
     </div>
+    
+    <!-- Модальное окно создания дефекта -->
+    <CreateDefectModal
+      :show="showCreateDefectModal"
+      :projectId="null"
+      @close="closeCreateDefectModal"
+      @created="handleDefectCreated"
+    />
   </div>
 </template>
 
@@ -182,5 +193,17 @@ h1 {
 .empty-state p {
   margin-bottom: 1rem;
   color: var(--color-text-light);
+}
+
+.alert {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--border-radius);
+}
+
+.alert-error {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #d32f2f;
+  border: 1px solid rgba(244, 67, 54, 0.3);
 }
 </style>

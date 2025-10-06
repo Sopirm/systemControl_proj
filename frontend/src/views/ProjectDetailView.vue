@@ -5,6 +5,7 @@ import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
 import DefectItem from '../components/DefectItem.vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
+import CreateDefectModal from '../components/CreateDefectModal.vue'
 import { useAuth } from '../composables/useAuth'
 import { projectService, type Project } from '../services/projectService'
 import { defectService, type Defect, type DefectStats } from '../services/defectService'
@@ -62,10 +63,11 @@ const loadDefectStats = async () => {
   try {
     const stats = await defectService.getDefectStatsByProjectId(Number(projectId))
     defectStats.value = stats
+    console.log(`Статистика дефектов для проекта ${projectId}:`, stats)
   } catch (err) {
     console.error(`Ошибка при загрузке статистики дефектов для проекта ${projectId}:`, err)
-    // Используем демо-данные в случае ошибки
-    defectStats.value = defectService.generateDemoDefectStats(Number(projectId))
+    // В случае ошибки устанавливаем нулевые значения
+    defectStats.value = { active: 0, resolved: 0, total: 0 }
   }
 }
 
@@ -73,33 +75,14 @@ const loadDefectStats = async () => {
 const loadDefects = async () => {
   try {
     isLoadingDefects.value = true
-    // Попробуем загрузить реальные дефекты через API
+    // Загружаем реальные дефекты через API
     const projectDefects = await defectService.getDefectsByProjectId(Number(projectId))
     defects.value = projectDefects
+    console.log(`Загружено ${projectDefects.length} дефектов для проекта ${projectId}`)
   } catch (err) {
     console.error(`Ошибка при загрузке дефектов для проекта ${projectId}:`, err)
-    // В случае ошибки используем демо-данные
-    defects.value = [
-      {
-        id: 1,
-        title: 'Трещина в несущей стене',
-        description: 'На 3 этаже, 2 подъезд обнаружена трещина в несущей стене размером 1.5м',
-        priority: 'high',
-        status: 'new',
-        project_id: Number(projectId),
-        assignee: { id: 1, username: 'ivanov', full_name: 'Иванов И.И.', email: 'ivanov@example.com' },
-        due_date: '2023-10-15'
-      },
-      {
-        id: 2,
-        title: 'Протечка в потолке',
-        description: 'Кв. 42, 5 этаж - следы протечки на потолке в ванной комнате',
-        priority: 'medium',
-        status: 'in_progress',
-        project_id: Number(projectId),
-        assignee: { id: 2, username: 'petrov', full_name: 'Петров П.П.', email: 'petrov@example.com' }
-      }
-    ] as Defect[]
+    // В случае ошибки отображаем пустой список
+    defects.value = []
   } finally {
     isLoadingDefects.value = false
   }
@@ -156,6 +139,34 @@ const deleteProject = async () => {
 const isActiveProject = computed(() => {
   return project.value?.status === 'active'
 })
+
+// Проверка прав доступа
+const permissions = defectService.checkPermissions()
+
+// Состояние модального окна создания дефекта
+const showCreateDefectModal = ref(false)
+
+// Открытие модального окна создания дефекта
+const openCreateDefectModal = () => {
+  showCreateDefectModal.value = true
+}
+
+// Закрытие модального окна создания дефекта
+const closeCreateDefectModal = () => {
+  showCreateDefectModal.value = false
+}
+
+// Обработка создания дефекта
+const handleDefectCreated = (defect: Defect) => {
+  // Добавляем новый дефект в список
+  defects.value.push(defect)
+  
+  // Обновляем статистику
+  loadDefectStats()
+  
+  // Закрываем модальное окно
+  closeCreateDefectModal()
+}
 
 // Загрузка проекта при монтировании компонента
 onMounted(() => {
@@ -260,7 +271,12 @@ onMounted(() => {
       <div class="project-defects-section">
         <div class="section-header flex-between">
           <h2>Дефекты проекта</h2>
-          <BaseButton v-if="isActiveProject">Добавить дефект</BaseButton>
+          <BaseButton 
+            v-if="isActiveProject && permissions.canCreate" 
+            @click="openCreateDefectModal"
+          >
+            Добавить дефект
+          </BaseButton>
         </div>
 
         <div v-if="defects.length === 0" class="empty-state">
@@ -274,7 +290,9 @@ onMounted(() => {
             :defect="defect"
           >
             <template #actions>
-              <BaseButton variant="outline">Подробнее</BaseButton>
+              <RouterLink :to="`/defects/${defect.id}`">
+                <BaseButton variant="outline">Подробнее</BaseButton>
+              </RouterLink>
             </template>
           </DefectItem>
         </div>
@@ -296,6 +314,14 @@ onMounted(() => {
       confirm-variant="danger"
       @confirm="deleteProject"
       @cancel="showDeleteConfirm = false"
+    />
+    
+    <!-- Модальное окно создания дефекта -->
+    <CreateDefectModal
+      :show="showCreateDefectModal"
+      :projectId="projectId"
+      @close="closeCreateDefectModal"
+      @created="handleDefectCreated"
     />
   </div>
 </template>
