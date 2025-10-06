@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineProps<{
   type?: 'button' | 'submit' | 'reset'
-  variant?: 'primary' | 'outline' | 'text'
+  variant?: 'primary' | 'outline' | 'text' | 'danger'
   disabled?: boolean
 }>()
 </script>
@@ -59,6 +59,17 @@ defineProps<{
 
 .btn-text:hover:not(:disabled) {
   background-color: rgba(30, 144, 255, 0.1);
+}
+
+.btn-danger {
+  background-color: #f44336;
+  color: white;
+  border: 1px solid #f44336;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #d32f2f;
+  border-color: #d32f2f;
 }
 
 .base-button:disabled {

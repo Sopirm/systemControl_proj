@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
 import DefectItem from '../components/DefectItem.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
 import { useAuth } from '../composables/useAuth'
 import { projectService, type Project } from '../services/projectService'
 import { defectService, type Defect, type DefectStats } from '../services/defectService'
@@ -18,6 +19,8 @@ const error = ref('')
 const defects = ref<Defect[]>([])
 const defectStats = ref<DefectStats>({ active: 0, resolved: 0, total: 0 })
 const isLoadingDefects = ref(false)
+const isDeleting = ref(false)
+const showDeleteConfirm = ref(false)
 
 // Функция для форматирования даты
 const formatDate = (dateString: string) => {
@@ -129,6 +132,31 @@ const editProject = () => {
   router.push(`/projects/${projectId}/edit`)
 }
 
+// Открытие диалога подтверждения удаления
+const openDeleteConfirm = () => {
+  showDeleteConfirm.value = true
+}
+
+// Удаление проекта
+const deleteProject = async () => {
+  try {
+    isDeleting.value = true
+    await projectService.deleteProject(Number(projectId))
+    router.push('/projects')
+  } catch (err) {
+    console.error('Ошибка при удалении проекта:', err)
+    error.value = err instanceof Error ? err.message : 'Ошибка при удалении проекта'
+  } finally {
+    isDeleting.value = false
+    showDeleteConfirm.value = false
+  }
+}
+
+// Проверка активности проекта
+const isActiveProject = computed(() => {
+  return project.value?.status === 'active'
+})
+
 // Загрузка проекта при монтировании компонента
 onMounted(() => {
   loadProject()
@@ -155,7 +183,10 @@ onMounted(() => {
           </span>
         </div>
         <div class="project-actions">
-          <BaseButton v-if="isManager" variant="outline" @click="editProject">Редактировать</BaseButton>
+          <div v-if="isManager" class="button-group">
+            <BaseButton variant="outline" @click="editProject">Редактировать</BaseButton>
+            <BaseButton variant="danger" @click="openDeleteConfirm">Удалить</BaseButton>
+          </div>
         </div>
       </div>
 
@@ -229,7 +260,7 @@ onMounted(() => {
       <div class="project-defects-section">
         <div class="section-header flex-between">
           <h2>Дефекты проекта</h2>
-          <BaseButton>Добавить дефект</BaseButton>
+          <BaseButton v-if="isActiveProject">Добавить дефект</BaseButton>
         </div>
 
         <div v-if="defects.length === 0" class="empty-state">
@@ -254,6 +285,18 @@ onMounted(() => {
       <p>Проект с ID {{ projectId }} не существует или был удален.</p>
       <RouterLink to="/projects" class="btn">Вернуться к списку проектов</RouterLink>
     </div>
+    
+    <!-- Модальное окно подтверждения удаления -->
+    <ConfirmModal
+      :show="showDeleteConfirm"
+      title="Удаление проекта"
+      message="Вы уверены, что хотите удалить этот проект? Это действие нельзя отменить."
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      confirm-variant="danger"
+      @confirm="deleteProject"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>
 
@@ -281,6 +324,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.project-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.75rem;
 }
 
 h1 {
