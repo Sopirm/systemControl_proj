@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import BaseCard from '../components/BaseCard.vue'
 import BaseInput from '../components/BaseInput.vue'
 import BaseButton from '../components/BaseButton.vue'
-import BaseSelect from '../components/BaseSelect.vue'
 import { authService } from '../services/api'
 
 const router = useRouter()
@@ -13,20 +12,13 @@ const username = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const role = ref('')
 const error = ref('')
 const isLoading = ref(false)
-
-const roleOptions = [
-  { value: 'manager', label: 'Менеджер' },
-  { value: 'engineer', label: 'Инженер' },
-  { value: 'observer', label: 'Наблюдатель' }
-]
 
 const handleRegister = async () => {
   error.value = ''
   
-  if (!fullName.value || !username.value || !email.value || !password.value || !confirmPassword.value || !role.value) {
+  if (!fullName.value || !username.value || !email.value || !password.value || !confirmPassword.value) {
     error.value = 'Пожалуйста, заполните все поля'
     return
   }
@@ -44,8 +36,7 @@ const handleRegister = async () => {
       username: username.value,
       full_name: fullName.value,
       email: email.value,
-      password: password.value,
-      role: role.value
+      password: password.value
     })
     
     console.log('Пользователь успешно зарегистрирован:', response.user)
@@ -104,13 +95,7 @@ const handleRegister = async () => {
           required
         />
         
-        <BaseSelect
-          v-model="role"
-          label="Роль в системе"
-          :options="roleOptions"
-          placeholder="Выберите вашу роль"
-          required
-        />
+        <!-- Роль назначается автоматически как 'Наблюдатель' на сервере -->
 
         <div class="form-actions">
           <BaseButton type="submit" :disabled="isLoading">

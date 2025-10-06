@@ -26,116 +26,102 @@ func NewUserController(config *config.Config) *UserController {
 		Config: config,
 	}
 }
-
 // регистрация нового пользователя
 func (uc *UserController) Register(c *gin.Context) {
-	var userReg models.UserRegistration
+    var userReg models.UserRegistration
+    if err := c.ShouldBindJSON(&userReg); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	if err := c.ShouldBindJSON(&userReg); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    // Отладочная информация
+    log.Printf("Получен запрос на регистрацию: username=%s, email=%s", userReg.Username, userReg.Email)
 
-	// Отладочная информация
-	log.Printf("Получен запрос на регистрацию: username=%s, email=%s, role=%s",
-		userReg.Username, userReg.Email, userReg.Role)
+    // проверка, что пользователь с таким именем или email уже существует
+    var existingUser models.User
+    if result := uc.DB.Where("username = ? OR email = ?", userReg.Username, userReg.Email).First(&existingUser); result.Error == nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "пользователь с таким именем или email уже существует"})
+        return
+    }
 
-	// проверка, что пользователь с таким именем не существует
-	var existingUser models.User
-	if result := uc.DB.Where("username = ? OR email = ?", userReg.Username, userReg.Email).First(&existingUser); result.Error == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "пользователь с таким именем или email уже существует"})
-		return
-	}
+    // Хеширование пароля
+    hashedPassword, err := models.HashPassword(userReg.Password)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при хешировании пароля"})
+        return
+    }
 
-	// Хеширование пароля
-	hashedPassword, err := models.HashPassword(userReg.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при хешировании пароля"})
-		return
-	}
+    // Создание нового пользователя: роль всегда observer
+    user := models.User{
+        Username:     userReg.Username,
+        Email:        userReg.Email,
+        PasswordHash: hashedPassword,
+        FullName:     userReg.FullName,
+        Role:         models.RoleObserver,
+    }
 
-	// Создание нового пользователя
-	user := models.User{
-		Username:     userReg.Username,
-		Email:        userReg.Email,
-		PasswordHash: hashedPassword,
-		FullName:     userReg.FullName,
-		Role:         userReg.Role,
-	}
+    // Сохранение пользователя
+    if result := uc.DB.Create(&user); result.Error != nil {
+        log.Printf("Ошибка при сохранении пользователя: %v", result.Error)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при сохранении пользователя"})
+        return
+    }
 
-	log.Printf("Создание пользователя: %+v", user)
+    log.Printf("Пользователь успешно создан: ID=%d, username=%s, role=%s", user.ID, user.Username, user.Role)
 
-	// Сохранение пользователя в базе данных
-	if result := uc.DB.Create(&user); result.Error != nil {
-		log.Printf("Ошибка при сохранении пользователя: %v", result.Error)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при сохранении пользователя"})
-		return
-	}
-
-	log.Printf("Пользователь успешно создан: ID=%d, username=%s, role=%s",
-		user.ID, user.Username, user.Role)
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "пользователь успешно зарегистрирован",
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"full_name": user.FullName,
-			"role":     user.Role,
-		},
-	})
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "пользователь успешно зарегистрирован",
+        "user": gin.H{
+            "id":        user.ID,
+            "username":  user.Username,
+            "email":     user.Email,
+            "full_name": user.FullName,
+            "role":      user.Role,
+        },
+    })
 }
 
 // вход пользователя в систему
 func (uc *UserController) Login(c *gin.Context) {
-	var userLogin models.UserLogin
+    var userLogin models.UserLogin
+    if err := c.ShouldBindJSON(&userLogin); err != nil {
+        log.Printf("Ошибка при разборе JSON запроса: %v", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
 
-	if err := c.ShouldBindJSON(&userLogin); err != nil {
-		log.Printf("Ошибка при разборе JSON запроса: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+    log.Printf("Попытка входа пользователя: %s", userLogin.Username)
 
-	log.Printf("Попытка входа пользователя: %s", userLogin.Username)
+    var user models.User
+    if result := uc.DB.Where("username = ? OR email = ?", userLogin.Username, userLogin.Username).First(&user); result.Error != nil {
+        log.Printf("Пользователь не найден: %s, ошибка: %v", userLogin.Username, result.Error)
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
+        return
+    }
 
-	// Поиск пользователя по имени пользователя или email
-	var user models.User
-	if result := uc.DB.Where("username = ? OR email = ?", userLogin.Username, userLogin.Username).First(&user); result.Error != nil {
-		log.Printf("Пользователь не найден: %s, ошибка: %v", userLogin.Username, result.Error)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
-		return
-	}
+    if err := user.CheckPassword(userLogin.Password); err != nil {
+        log.Printf("Неверный пароль для пользователя %s: %v", userLogin.Username, err)
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
+        return
+    }
 
-	log.Printf("Пользователь найден: %s, email: %s, ID: %d, роль: %s", user.Username, user.Email, user.ID, user.Role)
+    token, err := middleware.GenerateToken(&user, uc.Config)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при создании токена"})
+        return
+    }
 
-	// Проверка пароля
-	if err := user.CheckPassword(userLogin.Password); err != nil {
-		log.Printf("Неверный пароль для пользователя %s: %v", userLogin.Username, err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "неверное имя пользователя или пароль"})
-		return
-	}
-
-	log.Printf("Пароль верный для пользователя: %s", userLogin.Username)
-
-	// Создание JWT токена
-	token, err := middleware.GenerateToken(&user, uc.Config)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при создании токена"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "успешная авторизация",
-		"token":   token,
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"full_name": user.FullName,
-			"role":     user.Role,
-		},
-	})
+    c.JSON(http.StatusOK, gin.H{
+        "message": "успешная авторизация",
+        "token":   token,
+        "user": gin.H{
+            "id":        user.ID,
+            "username":  user.Username,
+            "email":     user.Email,
+            "full_name": user.FullName,
+            "role":      user.Role,
+        },
+    })
 }
 
 // получение профиля текущего пользователя
@@ -195,42 +181,42 @@ func (uc *UserController) GetAllUsers(c *gin.Context) {
 
 // получение списка инженеров (доступно менеджерам и инженерам)
 func (uc *UserController) GetEngineers(c *gin.Context) {
-    // Получаем роль и ID пользователя из контекста
-    userRole, _ := c.Get("role")
-    userID, _ := c.Get("userID")
+	// Получаем роль и ID пользователя из контекста
+	userRole, _ := c.Get("role")
+	userID, _ := c.Get("userID")
 
-    var users []models.User
-    query := uc.DB.Where("role = ?", models.RoleEngineer)
+	var users []models.User
+	query := uc.DB.Where("role = ?", models.RoleEngineer)
 
-    // Если запрос делает инженер, исключаем его самого из результата
-    if userRole == models.RoleEngineer {
-        if uid, ok := userID.(uint); ok {
-            query = query.Where("id <> ?", uid)
-        }
-    }
+	// Если запрос делает инженер, исключаем его самого из результата
+	if userRole == models.RoleEngineer {
+		if uid, ok := userID.(uint); ok {
+			query = query.Where("id <> ?", uid)
+		}
+	}
 
-    if result := query.Find(&users); result.Error != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении списка инженеров"})
-        return
-    }
+	if result := query.Find(&users); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении списка инженеров"})
+		return
+	}
 
-    // Создаем безопасные для передачи объекты (без хешей паролей)
-    safeUsers := make([]gin.H, len(users))
-    for i, user := range users {
-        safeUsers[i] = gin.H{
-            "id":         user.ID,
-            "username":   user.Username,
-            "email":      user.Email,
-            "full_name":  user.FullName,
-            "role":       user.Role,
-            "created_at": user.CreatedAt,
-        }
-    }
+	// Создаем безопасные для передачи объекты (без хешей паролей)
+	safeUsers := make([]gin.H, len(users))
+	for i, user := range users {
+		safeUsers[i] = gin.H{
+			"id":         user.ID,
+			"username":   user.Username,
+			"email":      user.Email,
+			"full_name":  user.FullName,
+			"role":       user.Role,
+			"created_at": user.CreatedAt,
+		}
+	}
 
-    c.JSON(http.StatusOK, gin.H{
-        "users": safeUsers,
-        "count": len(users),
-    })
+	c.JSON(http.StatusOK, gin.H{
+		"users": safeUsers,
+		"count": len(users),
+	})
 }
 
 // обновление роли пользователя (только для менеджеров)
