@@ -52,6 +52,40 @@ export const userService = {
   },
 
   /**
+   * Получение списка инженеров
+   * Доступно менеджерам и инженерам
+   */
+  async getEngineers(): Promise<User[]> {
+    const token = authService.getAuthToken();
+    if (!token) {
+      throw new Error('Пользователь не авторизован');
+    }
+
+    const response = await fetch('/api/users/engineers', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Ошибка при парсинге ответа:', e);
+      throw new Error('Ошибка соединения с сервером');
+    }
+
+    if (!response.ok) {
+      console.error('Ошибка получения инженеров:', data);
+      throw new Error(data?.error || `Ошибка получения инженеров (${response.status})`);
+    }
+
+    return data.users as User[];
+  },
+
+  /**
    * Обновление роли пользователя
    * Доступно только для менеджеров
    */

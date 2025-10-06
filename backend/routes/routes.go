@@ -93,6 +93,8 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 		users := api.Group("/users")
 		{
 			users.GET("", middleware.RoleMiddleware(models.RoleManager), userController.GetAllUsers)
+			// Доступно менеджерам и инженерам: получить список инженеров
+			users.GET("/engineers", middleware.RoleMiddleware(models.RoleManager, models.RoleEngineer), userController.GetEngineers)
 			users.PUT("/:id/role", middleware.RoleMiddleware(models.RoleManager), userController.UpdateUserRole)
 		}
 
@@ -105,7 +107,6 @@ func SetupRoutes(router *gin.Engine, cfg *config.Config) {
 			projects.PUT("/:id", middleware.RoleMiddleware(models.RoleManager), projectController.UpdateProject)
 			projects.DELETE("/:id", middleware.RoleMiddleware(models.RoleManager), projectController.DeleteProject)
 		}
-
 		// маршруты для дефектов
 		defects := api.Group("/defects")
 		{

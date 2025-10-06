@@ -190,6 +190,46 @@ func (uc *UserController) GetAllUsers(c *gin.Context) {
 	})
 }
 
+// получение списка инженеров (доступно менеджерам и инженерам)
+func (uc *UserController) GetEngineers(c *gin.Context) {
+    // Получаем роль и ID пользователя из контекста
+    userRole, _ := c.Get("role")
+    userID, _ := c.Get("userID")
+
+    var users []models.User
+    query := uc.DB.Where("role = ?", models.RoleEngineer)
+
+    // Если запрос делает инженер, исключаем его самого из результата
+    if userRole == models.RoleEngineer {
+        if uid, ok := userID.(uint); ok {
+            query = query.Where("id <> ?", uid)
+        }
+    }
+
+    if result := query.Find(&users); result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении списка инженеров"})
+        return
+    }
+
+    // Создаем безопасные для передачи объекты (без хешей паролей)
+    safeUsers := make([]gin.H, len(users))
+    for i, user := range users {
+        safeUsers[i] = gin.H{
+            "id":         user.ID,
+            "username":   user.Username,
+            "email":      user.Email,
+            "full_name":  user.FullName,
+            "role":       user.Role,
+            "created_at": user.CreatedAt,
+        }
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "users": safeUsers,
+        "count": len(users),
+    })
+}
+
 // обновление роли пользователя (только для менеджеров)
 func (uc *UserController) UpdateUserRole(c *gin.Context) {
 	// Проверка роли выполняется в middleware

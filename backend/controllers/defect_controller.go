@@ -38,6 +38,9 @@ func (dc *DefectController) CreateDefect(c *gin.Context) {
 		return
 	}
 
+	// Получение роли пользователя из контекста
+	userRole, _ := c.Get("role")
+
 	// Проверка существования проекта
 	var project models.Project
 	if result := dc.DB.First(&project, defectCreate.ProjectID); result.Error != nil {
@@ -51,6 +54,13 @@ func (dc *DefectController) CreateDefect(c *gin.Context) {
 		if result := dc.DB.First(&assignee, defectCreate.AssigneeID); result.Error != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "указанный исполнитель не найден"})
 			return
+		}
+		// Если текущий пользователь инженер, он может назначать только инженера
+		if role, ok := userRole.(models.Role); ok && role == models.RoleEngineer {
+			if assignee.Role != models.RoleEngineer {
+				c.JSON(http.StatusForbidden, gin.H{"error": "инженер может назначать исполнителем только инженера"})
+				return
+			}
 		}
 	}
 
@@ -186,6 +196,14 @@ func (dc *DefectController) UpdateDefect(c *gin.Context) {
 		if result := dc.DB.First(&assignee, defectUpdate.AssigneeID); result.Error != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "указанный исполнитель не найден"})
 			return
+		}
+		// Если текущий пользователь инженер, он может назначать только инженера
+		userRole, _ := c.Get("role")
+		if role, ok := userRole.(models.Role); ok && role == models.RoleEngineer {
+			if assignee.Role != models.RoleEngineer {
+				c.JSON(http.StatusForbidden, gin.H{"error": "инженер может назначать исполнителем только инженера"})
+				return
+			}
 		}
 		defect.AssigneeID = defectUpdate.AssigneeID
 	}

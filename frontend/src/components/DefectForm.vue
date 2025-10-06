@@ -61,10 +61,15 @@ const statusOptions = [
 // Функция для загрузки инженеров
 const loadEngineers = async () => {
   try {
-    const users = await userService.getAllUsers()
-    engineers.value = users.filter(user => 
-      user.role === 'engineer' || user.role === 'manager'
-    )
+    const user = currentUser.value
+    if (user?.role === 'engineer') {
+      // Инженер может загрузить только других инженеров
+      engineers.value = await userService.getEngineers()
+    } else {
+      // Менеджер получает всех пользователей и может назначать инженеров/менеджеров
+      const users = await userService.getAllUsers()
+      engineers.value = users.filter(u => u.role === 'engineer' || u.role === 'manager')
+    }
   } catch (err) {
     console.error('Ошибка при загрузке списка инженеров:', err)
     error.value = 'Не удалось загрузить список исполнителей'
