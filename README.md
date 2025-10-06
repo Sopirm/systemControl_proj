@@ -142,7 +142,100 @@ go run cmd/migrate/main.go --rollback
 - Валидация всех входящих данных
 - Отладочные функции с доступом только для разработчиков
 
-## 🚀 Запуск проекта
+## 🐳 Запуск через Docker
+
+### 1. Подготовка окружения
+
+- **Windows**
+  - Установите Docker Desktop и включите режим Linux containers (WSL2 Integration — желательно).
+  - Создайте `.env` из примера:
+    - PowerShell:
+      ```powershell
+      Copy-Item -Path ".env.example" -Destination ".env" -Force
+      ```
+    - CMD:
+      ```cmd
+      copy /Y .env.example .env
+      ```
+
+- **Linux/macOS**
+  - Установите Docker Engine и плагин Compose.
+  - Создайте `.env` из примера:
+    ```bash
+    cp .env.example .env
+    ```
+
+Откройте `.env` и при необходимости измените параметры (порты и данные БД). Значение `DB_PASSWORD` используется как пароль пользователя `POSTGRES_USER` в контейнере PostgreSQL.
+
+### 2. Сборка и запуск контейнеров
+
+- **Windows (PowerShell/CMD)**
+  ```powershell
+  docker compose up -d --build
+  ```
+- **Linux/macOS**
+  ```bash
+  # при необходимости добавьте sudo (если пользователь не в группе docker)
+  docker compose up -d --build
+  # или
+  sudo docker compose up -d --build
+  ```
+
+Адреса по умолчанию:
+- Backend API: http://localhost:${SERVER_PORT:-8080} (по умолчанию 8080)
+- Frontend: http://localhost:${FRONTEND_PORT:-5173} (по умолчанию 5173)
+
+### 3. Миграции базы данных
+
+Миграции применяются автоматически при запуске `backend` (в `docker-compose.yml` используется команда `/app/migrate && /app/server`).
+
+Ручной запуск/откат при необходимости:
+
+```bash
+docker compose exec backend /app/migrate
+docker compose exec backend /app/migrate --rollback
+```
+
+### 4. Полезные команды
+
+- **Windows**
+  ```powershell
+  docker compose ps
+  docker compose logs -f backend
+  docker compose logs -f frontend
+  docker compose logs -f db
+  docker compose down
+  docker compose down -v   # очистить volume БД
+  ```
+
+- **Linux/macOS**
+  ```bash
+  docker compose ps
+  docker compose logs -f backend
+  docker compose logs -f frontend
+  docker compose logs -f db
+  docker compose down
+  docker compose down -v   # очистить volume БД
+  # при необходимости используйте sudo
+  # sudo docker compose ...
+  ```
+
+### 5. Траблшутинг и заметки
+
+- **Windows**
+  - Убедитесь, что Docker Desktop запущен и выбран режим Linux containers.
+  - Включите WSL2 Integration (Settings → Resources → WSL Integration).
+  - Предупреждение compose про `version` можно игнорировать или удалить строку `version: "3.9"`.
+- **Linux/macOS**
+  - Если требуется `sudo` для docker-команд, можно добавить пользователя в группу docker:
+    ```bash
+    sudo usermod -aG docker $USER
+    # выйдите и войдите в систему заново, затем проверьте
+    docker ps
+    ```
+  - Предупреждение compose про `version` можно игнорировать или удалить строку `version: "3.9"`.
+
+## 🚀 Запуск проекта без использования Docker
 
 Для запуска проекта вам потребуется установить Go и Node.js на вашей системе.
 
