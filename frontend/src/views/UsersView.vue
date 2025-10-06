@@ -5,12 +5,14 @@ import BaseInput from '../components/BaseInput.vue'
 import BaseSelect from '../components/BaseSelect.vue'
 import BaseButton from '../components/BaseButton.vue'
 import { userService, User } from '../services/userService'
+import { useAuth } from '../composables/useAuth'
 
 // Используем интерфейс User из userService.ts
 
 const users = ref<User[]>([])
 const isLoading = ref(true)
 const error = ref('')
+const { currentUser } = useAuth()
 
 const roleOptions = [
   { value: 'manager', label: 'Менеджер' },
@@ -37,6 +39,11 @@ const updateError = ref('')
 
 const updateUserRole = async (userId: number, newRole: string) => {
   try {
+    // Запрещаем менять роль у самого себя на клиенте
+    if (currentUser.value && currentUser.value.id === userId) {
+      updateError.value = 'Нельзя менять роль у самого себя'
+      return
+    }
     isUpdating.value = true
     updateError.value = ''
 
@@ -87,6 +94,17 @@ const loadUsers = async () => {
 <template>
   <div class="users-page container">
     <h1>Управление пользователями</h1>
+
+    <!-- Личный аккаунт -->
+    <BaseCard v-if="currentUser" title="Личный аккаунт" class="self-card">
+      <div class="self-grid">
+        <div><strong>Имя пользователя:</strong> {{ currentUser.username }}</div>
+        <div><strong>ФИО:</strong> {{ currentUser.full_name || '—' }}</div>
+        <div><strong>Email:</strong> {{ currentUser.email }}</div>
+        <div><strong>Роль:</strong> {{ currentUser.role }}</div>
+      </div>
+      <small class="hint">Собственную роль изменить нельзя</small>
+    </BaseCard>
     
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     
@@ -115,6 +133,7 @@ const loadUsers = async () => {
                 <BaseSelect
                   v-model="user.role"
                   :options="roleOptions"
+                  :disabled="isUpdating || (currentUser && user.id === currentUser.id)"
                   @change="updateUserRole(user.id, user.role)"
                 />
               </td>

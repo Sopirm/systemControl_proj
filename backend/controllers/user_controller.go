@@ -3,6 +3,7 @@ package controllers
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"systemControl_proj/config"
 	"systemControl_proj/database"
 	"systemControl_proj/middleware"
@@ -80,6 +81,7 @@ func (uc *UserController) Register(c *gin.Context) {
 			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
+			"full_name": user.FullName,
 			"role":     user.Role,
 		},
 	})
@@ -130,6 +132,7 @@ func (uc *UserController) Login(c *gin.Context) {
 			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
+			"full_name": user.FullName,
 			"role":     user.Role,
 		},
 	})
@@ -234,7 +237,21 @@ func (uc *UserController) GetEngineers(c *gin.Context) {
 func (uc *UserController) UpdateUserRole(c *gin.Context) {
 	// Проверка роли выполняется в middleware
 
-	userID := c.Param("id")
+	// ID цели из маршрута и проверка корректности
+	userIDStr := c.Param("id")
+	targetID, convErr := strconv.Atoi(userIDStr)
+	if convErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "некорректный ID пользователя"})
+		return
+	}
+
+	// Запрещаем менять роль у самого себя
+	if ctxUserID, ok := c.Get("userID"); ok {
+		if uid, ok2 := ctxUserID.(uint); ok2 && uid == uint(targetID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "нельзя изменять роль собственного аккаунта"})
+			return
+		}
+	}
 
 	var roleUpdate struct {
 		Role string `json:"role" binding:"required"`
@@ -257,8 +274,8 @@ func (uc *UserController) UpdateUserRole(c *gin.Context) {
 
 	// Поиск пользователя
 	var user models.User
-	if result := uc.DB.First(&user, userID); result.Error != nil {
-		log.Printf("Пользователь для обновления роли не найден: ID=%s", userID)
+	if result := uc.DB.First(&user, targetID); result.Error != nil {
+		log.Printf("Пользователь для обновления роли не найден: ID=%d", targetID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "пользователь не найден"})
 		return
 	}

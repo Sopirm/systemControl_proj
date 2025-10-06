@@ -132,5 +132,39 @@ export const authService = {
    */
   getAuthToken(): string | null {
     return localStorage.getItem('authToken');
+  },
+
+  /**
+   * Fetch current user profile from backend and update local cache
+   */
+  async getProfile(): Promise<User> {
+    const token = this.getAuthToken();
+    if (!token) throw new Error('Пользователь не авторизован');
+
+    const response = await fetch('/api/profile', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    let data: any;
+    try {
+      data = await response.json();
+    } catch (e) {
+      console.error('Ошибка при парсинге ответа профиля:', e);
+      throw new Error('Ошибка соединения с сервером');
+    }
+
+    if (!response.ok) {
+      console.error('Ошибка получения профиля:', data);
+      throw new Error(data?.error || `Ошибка получения профиля (${response.status})`);
+    }
+
+    const user = data.user as User;
+    // Обновляем локальный кэш, чтобы во всех местах появились актуальные поля (в т.ч. full_name)
+    localStorage.setItem('user', JSON.stringify(user));
+    return user;
   }
 };
