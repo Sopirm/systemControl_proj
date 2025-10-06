@@ -24,7 +24,8 @@ defineProps<{
   background-color: var(--color-background);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-default);
-  overflow: hidden;
+  /* Не скрываем переполнение, чтобы внутренние контейнеры могли прокручиваться */
+  overflow: visible;
 }
 
 .with-border {
@@ -45,6 +46,11 @@ defineProps<{
 
 .card-content {
   padding: 1rem;
+  /* Разрешаем горизонтальную прокрутку контента (например, широких таблиц) */
+  overflow-x: auto;
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  display: block;
 }
 
 .card-footer {
