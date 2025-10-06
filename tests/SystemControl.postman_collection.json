@@ -1,0 +1,345 @@
+{
+  "info": {
+    "_postman_id": "3a2a2bb3-02a9-4b2a-9e4d-2a0a03e0b7c1",
+    "name": "SystemControl API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman коллекция для тестирования backend API проекта SystemControl."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "managerUsername", "value": "testuser", "type": "string" },
+    { "key": "managerPassword", "value": "test123", "type": "string" },
+    { "key": "currentUserId", "value": "", "type": "string" },
+    { "key": "projectId", "value": "", "type": "string" },
+    { "key": "defectId", "value": "", "type": "string" },
+    { "key": "commentId", "value": "", "type": "string" },
+    { "key": "targetUserId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (manager)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{managerUsername}}\",\n  \"email\": \"test@example.com\",\n  \"password\": \"{{managerPassword}}\",\n  \"full_name\": \"Тестовый Пользователь\",\n  \"role\": \"manager\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Допускаем 201 (создан) или 400 (уже существует)",
+                  "pm.test('Register status is 201 or 400', function () {",
+                  "  pm.expect([201, 400]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{managerUsername}}\",\n  \"password\": \"{{managerPassword}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login status is 200', function () { pm.response.to.have.status(200); });",
+                  "var json = pm.response.json();",
+                  "pm.collectionVariables.set('token', json.token);",
+                  "pm.collectionVariables.set('currentUserId', json.user && json.user.id ? json.user.id : '');",
+                  "pm.test('Token present', function () { pm.expect(json.token).to.be.a('string').and.not.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Debug",
+      "item": [
+        {
+          "name": "Create test user (manager)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/debug/create-test-user", "host": ["{{baseUrl}}"], "path": ["debug", "create-test-user"] }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create test user is 200/201', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "var j = pm.response.json();",
+                  "if (j && j.user) { pm.collectionVariables.set('managerUsername', j.user.username); pm.collectionVariables.set('managerPassword', j.user.password || pm.collectionVariables.get('managerPassword')); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users (auth)",
+      "item": [
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/profile", "host": ["{{baseUrl}}"], "path": ["api", "profile"] }
+          },
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "exec": [ "pm.response.to.have.status(200);" ], "type": "text/javascript" } }
+          ]
+        },
+        {
+          "name": "Get all users (manager)",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(200);",
+                  "var j = pm.response.json();",
+                  "if (j && j.users && j.users.length > 0) { pm.collectionVariables.set('targetUserId', j.users[0].id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get engineers",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/users/engineers", "host": ["{{baseUrl}}"], "path": ["api", "users", "engineers"] }
+          },
+          "response": [],
+          "event": [ { "listen": "test", "script": { "exec": [ "pm.response.to.have.status(200);" ], "type": "text/javascript" } } ]
+        },
+        {
+          "name": "Update user role (manager)",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/users/{{targetUserId}}/role", "host": ["{{baseUrl}}"], "path": ["api", "users", "{{targetUserId}}", "role"] },
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"engineer\"\n}" }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Projects (auth)",
+      "item": [
+        {
+          "name": "Create project (manager)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Объект 1\",\n  \"description\": \"Описание объекта\",\n  \"location\": \"Москва\",\n  \"start_date\": \"2025-01-01T00:00:00Z\",\n  \"end_date\": \"2025-12-31T00:00:00Z\",\n  \"status\": \"active\",\n  \"manager_id\": {{currentUserId}}\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(201);",
+                  "var j = pm.response.json();",
+                  "pm.collectionVariables.set('projectId', j.project ? j.project.id : (j.id || ''));",
+                  "pm.test('projectId saved', function(){ pm.expect(pm.collectionVariables.get('projectId')).to.not.equal(''); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get all projects",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/projects", "host": ["{{baseUrl}}"], "path": ["api", "projects"] }
+          },
+          "response": [],
+          "event": [ { "listen": "test", "script": { "exec": [ "pm.response.to.have.status(200);" ], "type": "text/javascript" } } ]
+        },
+        {
+          "name": "Get project by id",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update project (manager)",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Обновленное описание\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete project (manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/projects/{{projectId}}", "host": ["{{baseUrl}}"], "path": ["api", "projects", "{{projectId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Defects (auth)",
+      "item": [
+        {
+          "name": "Create defect",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects", "host": ["{{baseUrl}}"], "path": ["api", "defects"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Трещины в стене\",\n  \"description\": \"Обнаружены трещины в несущей стене\",\n  \"project_id\": {{projectId}},\n  \"priority\": \"high\",\n  \"assignee_id\": {{currentUserId}},\n  \"due_date\": \"2025-03-01T00:00:00Z\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.response.to.have.status(201);",
+                  "var j = pm.response.json();",
+                  "pm.collectionVariables.set('defectId', j.defect ? j.defect.id : (j.id || ''));",
+                  "pm.test('defectId saved', function(){ pm.expect(pm.collectionVariables.get('defectId')).to.not.equal(''); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get all defects",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects", "host": ["{{baseUrl}}"], "path": ["api", "defects"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get defect by id",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/{{defectId}}", "host": ["{{baseUrl}}"], "path": ["api", "defects", "{{defectId}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update defect",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/{{defectId}}", "host": ["{{baseUrl}}"], "path": ["api", "defects", "{{defectId}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"in_progress\"\n}" }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete defect (manager/engineer)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/{{defectId}}", "host": ["{{baseUrl}}"], "path": ["api", "defects", "{{defectId}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Comments (auth)",
+      "item": [
+        {
+          "name": "Get comments by defect",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/{{defectId}}/comments", "host": ["{{baseUrl}}"], "path": ["api", "defects", "{{defectId}}", "comments"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create comment",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/comments", "host": ["{{baseUrl}}"], "path": ["api", "defects", "comments"] },
+            "body": { "mode": "raw", "raw": "{\n  \"defect_id\": {{defectId}},\n  \"content\": \"Комментарий из Postman\"\n}" }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": [ "var j = pm.response.json(); pm.collectionVariables.set('commentId', j.comment ? j.comment.id : (j.id || ''));" ], "type": "text/javascript" }
+            }
+          ]
+        },
+        {
+          "name": "Delete comment (author/manager)",
+          "request": {
+            "method": "DELETE",
+            "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/api/defects/comments/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["api", "defects", "comments", "{{commentId}}"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
