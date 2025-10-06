@@ -281,16 +281,14 @@ export const defectService = {
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`Получена статистика дефектов для проекта ${projectId} через API:`, data.stats);
         return data.stats;
       }
     } catch (e) {
-      console.log(`API для статистики дефектов проекта ${projectId} недоступен, будем считать вручную`);
+      // API недоступен, используем fallback
     }
     
     // Если специальный эндпоинт не реализован, считаем статистику вручную
     const defects = await this.getDefectsByProjectId(projectId);
-    console.log(`Получено ${defects.length} дефектов для проекта ${projectId}, считаем статистику`);
     
     // Подсчет активных и решенных дефектов
     const active = defects.filter(d => 

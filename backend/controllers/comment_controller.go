@@ -67,7 +67,7 @@ func (cc *CommentController) CreateComment(c *gin.Context) {
 
 // получение всех комментариев для конкретного дефекта
 func (cc *CommentController) GetDefectComments(c *gin.Context) {
-	defectID := c.Param("defect_id")
+	defectID := c.Param("id")
 
 	var comments []models.Comment
 	if result := cc.DB.Where("defect_id = ?", defectID).Preload("User").Find(&comments); result.Error != nil {

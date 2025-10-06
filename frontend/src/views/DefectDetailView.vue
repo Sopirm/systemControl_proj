@@ -5,6 +5,7 @@ import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
 import DefectForm from '../components/DefectForm.vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
+import CommentSection from '../components/CommentSection.vue'
 import { useAuth } from '../composables/useAuth'
 import { defectService, type Defect } from '../services/defectService'
 
@@ -237,7 +238,10 @@ onMounted(() => {
           </div>
         </BaseCard>
 
-        <!-- Здесь в будущем можно добавить секцию для комментариев -->
+        <!-- Секция комментариев -->
+        <div class="comments-section">
+          <CommentSection :defect-id="Number(defectId)" />
+        </div>
       </template>
     </template>
     
